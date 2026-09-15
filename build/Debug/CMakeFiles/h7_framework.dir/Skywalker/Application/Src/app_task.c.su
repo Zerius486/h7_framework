@@ -1,0 +1,13 @@
+D:/h7_framework/Skywalker/Application/Src/app_task.c:6:17:AppTaskNormalizePeriod	16	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:11:17:ManagerTaskInit	4	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:12:13:ManagerTaskLoop	4	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:13:17:GimbalTaskInit	4	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:14:13:GimbalTaskLoop	4	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:15:17:ChassisTaskInit	4	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:16:13:ChassisTaskLoop	4	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:17:17:ShootTaskInit	4	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:18:13:ShootTaskLoop	4	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:24:6:StartManger	24	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:39:6:StartGimbal	24	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:54:6:StartChassis	24	static
+D:/h7_framework/Skywalker/Application/Src/app_task.c:69:6:StartShoot	24	static

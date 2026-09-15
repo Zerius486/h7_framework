@@ -1,0 +1,4 @@
+D:/h7_framework/Skywalker/Algorithm/Src/alg_crc.c:68:9:GetCrc8	24	static
+D:/h7_framework/Skywalker/Algorithm/Src/alg_crc.c:85:10:GetCrc16	24	static
+D:/h7_framework/Skywalker/Algorithm/Src/alg_crc.c:102:6:CheckCrc8	16	static
+D:/h7_framework/Skywalker/Algorithm/Src/alg_crc.c:111:6:CheckCrc16	16	static
