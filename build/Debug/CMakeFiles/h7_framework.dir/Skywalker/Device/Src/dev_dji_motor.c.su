@@ -1,0 +1,8 @@
+D:/h7_framework/Skywalker/Device/Src/dev_dji_motor.c:8:14:DjiMotorCurrentLimitA	16	static
+D:/h7_framework/Skywalker/Device/Src/dev_dji_motor.c:21:14:DjiMotorClamp	24	static
+D:/h7_framework/Skywalker/Device/Src/dev_dji_motor.c:31:14:DjiMotorWrapPi	16	static
+D:/h7_framework/Skywalker/Device/Src/dev_dji_motor.c:47:7:DjiMotorCurrentUnitsToAmperes	16	static
+D:/h7_framework/Skywalker/Device/Src/dev_dji_motor.c:69:9:DjiMotorCurrentAmperesToUnits	16	static
+D:/h7_framework/Skywalker/Device/Src/dev_dji_motor.c:99:6:DjiMotorInit	24	static
+D:/h7_framework/Skywalker/Device/Src/dev_dji_motor.c:121:6:DjiMotorUpdate	24	static
+D:/h7_framework/Skywalker/Device/Src/dev_dji_motor.c:144:6:DjiMotorCurrentCalculate	32	static
