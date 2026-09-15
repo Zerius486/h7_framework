@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/h7_framework/build/Debug/cmake_install.cmake",
+		"D:/h7_framework/build/Debug/cmake/stm32cubemx/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

@@ -1,0 +1,8 @@
+D:/h7_framework/Core/Src/usart.c:46:6:MX_UART5_Init	8	static
+D:/h7_framework/Core/Src/usart.c:89:6:MX_UART7_Init	8	static
+D:/h7_framework/Core/Src/usart.c:133:6:MX_USART1_UART_Init	8	static
+D:/h7_framework/Core/Src/usart.c:177:6:MX_USART2_UART_Init	8	static
+D:/h7_framework/Core/Src/usart.c:221:6:MX_USART3_UART_Init	8	static
+D:/h7_framework/Core/Src/usart.c:265:6:MX_USART10_UART_Init	8	static
+D:/h7_framework/Core/Src/usart.c:308:6:HAL_UART_MspInit	280	static
+D:/h7_framework/Core/Src/usart.c:793:6:HAL_UART_MspDeInit	16	static
