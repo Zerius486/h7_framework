@@ -1,0 +1,5 @@
+D:/h7_framework/Core/Src/freertos.c:97:6:MX_FREERTOS_Init	8	static
+D:/h7_framework/Core/Src/freertos.c:148:13:StartManger	16	static
+D:/h7_framework/Core/Src/freertos.c:166:13:StartGimbal	16	static
+D:/h7_framework/Core/Src/freertos.c:184:13:StartChassis	16	static
+D:/h7_framework/Core/Src/freertos.c:202:13:StartShoot	16	static

@@ -1,0 +1,9 @@
+D:/h7_framework/Skywalker/Device/Src/dev_lk_motor.c:10:16:LkMotorClampCurrent	24	static
+D:/h7_framework/Skywalker/Device/Src/dev_lk_motor.c:28:10:LkMotorFeedbackId	16	static
+D:/h7_framework/Skywalker/Device/Src/dev_lk_motor.c:40:6:LkMotorInit	16	static
+D:/h7_framework/Skywalker/Device/Src/dev_lk_motor.c:55:6:LkMotorUpdate	24	static
+D:/h7_framework/Skywalker/Device/Src/dev_lk_motor.c:94:6:LkMotorSetCurrentUnits	16	static
+D:/h7_framework/Skywalker/Device/Src/dev_lk_motor.c:105:6:LkMotorEnable	16	static
+D:/h7_framework/Skywalker/Device/Src/dev_lk_motor.c:115:6:LkMotorDisable	16	static
+D:/h7_framework/Skywalker/Device/Src/dev_lk_motor.c:128:6:LkMotorPackCurrentGroup	40	static
+D:/h7_framework/Skywalker/Device/Src/dev_lk_motor.c:161:6:LkMotorPackCurrentUnits4	24	static
