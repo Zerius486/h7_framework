@@ -9,7 +9,8 @@
  * @param fs 采样频率
  */
 void NotchFilterInit(NotchFilterObject *notch_filter, float f0, float q,
-                     float fs) {
+                     float fs)
+{
   float w0 = 2.0f * M_PI * f0 / fs;
   float alpha = sinf(w0) / (2.0f * q);
   float cos_w0 = cosf(w0);
@@ -30,7 +31,8 @@ void NotchFilterInit(NotchFilterObject *notch_filter, float f0, float q,
  * @param input 当前输入信号
  * @return 滤波后的输出信号
  */
-float NotchFilterProcess(NotchFilterObject *notch_filter, float input) {
+float NotchFilterProcess(NotchFilterObject *notch_filter, float input)
+{
   // 计算当前输出
   float output =
       notch_filter->a0 * input + notch_filter->a1 * notch_filter->x1 +

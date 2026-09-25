@@ -7,9 +7,11 @@
  * @param count 要分配的元素个数
  * @return 分配的内存指针，如果分配失败则返回NULL
  */
-static float *kf_alloc_f32(uint32_t count) {
+static float *kf_alloc_f32(uint32_t count)
+{
   float *ptr = (float *)malloc(count * sizeof(float));
-  if (ptr != NULL) {
+  if (ptr != NULL)
+  {
     memset(ptr, 0, count * sizeof(float));
   }
   return ptr;
@@ -20,11 +22,13 @@ static float *kf_alloc_f32(uint32_t count) {
  * @param rows 矩阵行数
  * @param cols 矩阵列数
  */
-static void KfSetIdentity(float *data, uint16_t rows, uint16_t cols) {
+static void KfSetIdentity(float *data, uint16_t rows, uint16_t cols)
+{
   uint16_t i;
   uint16_t diag_size = rows < cols ? rows : cols;
   memset(data, 0, (uint32_t)rows * (uint32_t)cols * sizeof(float));
-  for (i = 0; i < diag_size; i++) {
+  for (i = 0; i < diag_size; i++)
+  {
     data[(uint32_t)i * cols + i] = 1.0f;
   }
 }
@@ -34,8 +38,10 @@ static void KfSetIdentity(float *data, uint16_t rows, uint16_t cols) {
  * @param src 源向量指针
  * @param size 向量元素个数
  */
-static void KfCopyVector(float *dst, const float *src, uint16_t size) {
-  if ((dst == NULL) || (src == NULL) || (size == 0U)) {
+static void KfCopyVector(float *dst, const float *src, uint16_t size)
+{
+  if ((dst == NULL) || (src == NULL) || (size == 0U))
+  {
     return;
   }
   memcpy(dst, src, (uint32_t)size * sizeof(float));
@@ -44,8 +50,10 @@ static void KfCopyVector(float *dst, const float *src, uint16_t size) {
  * @brief 释放卡尔曼滤波器资源
  * @param kf 卡尔曼滤波器对象指针
  */
-void KfDeinit(KfObject *kf) {
-  if (kf == NULL) {
+void KfDeinit(KfObject *kf)
+{
+  if (kf == NULL)
+  {
     return;
   }
   free(kf->xhat_data);
@@ -81,9 +89,11 @@ void KfDeinit(KfObject *kf) {
  * @param z_size 观测向量大小
  * @return 0表示成功，-1表示失败
  */
-int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size) {
+int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size)
+{
   uint8_t i;
-  if ((kf == NULL) || (xhat_size == 0U) || (z_size == 0U)) {
+  if ((kf == NULL) || (xhat_size == 0U) || (z_size == 0U))
+  {
     return -1;
   }
   memset(kf, 0, sizeof(*kf));
@@ -122,7 +132,8 @@ int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size) {
       (kf->temp_xx_1_data == NULL) || (kf->temp_xx_2_data == NULL) ||
       (kf->temp_xz_data == NULL) || (kf->temp_zx_data == NULL) ||
       (kf->temp_zz_data == NULL) || (kf->temp_x1_data == NULL) ||
-      (kf->temp_z1_data == NULL)) {
+      (kf->temp_z1_data == NULL))
+  {
     KfDeinit(kf);
     return -1;
   }
@@ -152,17 +163,20 @@ int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size) {
   KfSetIdentity(kf->f_data, xhat_size, xhat_size);
   KfSetIdentity(kf->i_data, xhat_size, xhat_size);
   memset(kf->h_data, 0, (uint32_t)z_size * xhat_size * sizeof(float));
-  for (i = 0; (i < z_size) && (i < xhat_size); i++) {
+  for (i = 0; (i < z_size) && (i < xhat_size); i++)
+  {
     kf->h_data[(uint32_t)i * xhat_size + i] = 1.0f;
   }
   memset(kf->q_data, 0, (uint32_t)xhat_size * xhat_size * sizeof(float));
   memset(kf->r_data, 0, (uint32_t)z_size * z_size * sizeof(float));
   memset(kf->p_data, 0, (uint32_t)xhat_size * xhat_size * sizeof(float));
-  for (i = 0; i < xhat_size; i++) {
+  for (i = 0; i < xhat_size; i++)
+  {
     kf->q_data[(uint32_t)i * xhat_size + i] = 1e-3f;
     kf->p_data[(uint32_t)i * xhat_size + i] = 1.0f;
   }
-  for (i = 0; i < z_size; i++) {
+  for (i = 0; i < z_size; i++)
+  {
     kf->r_data[(uint32_t)i * z_size + i] = 1e-2f;
   }
   kf->is_inited = 1U;
@@ -173,35 +187,44 @@ int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size) {
  * @param kf 卡尔曼滤波器对象指针
  * @return 执行状态，ARM_MATH_SUCCESS表示成功，其他值表示失败
  */
-arm_status KfPredict(KfObject *kf) {
+arm_status KfPredict(KfObject *kf)
+{
   arm_status status;
-  if ((kf == NULL) || (kf->is_inited == 0U)) {
+  if ((kf == NULL) || (kf->is_inited == 0U))
+  {
     return ARM_MATH_ARGUMENT_ERROR;
   }
   status = arm_mat_mult_f32(&kf->f, &kf->xhat, &kf->xhat_minus);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
-  if (kf->u_size > 0U) {
+  if (kf->u_size > 0U)
+  {
     status = arm_mat_mult_f32(&kf->b, &kf->u, &kf->temp_x1);
-    if (status != ARM_MATH_SUCCESS) {
+    if (status != ARM_MATH_SUCCESS)
+    {
       return status;
     }
     status = arm_mat_add_f32(&kf->xhat_minus, &kf->temp_x1, &kf->xhat_minus);
-    if (status != ARM_MATH_SUCCESS) {
+    if (status != ARM_MATH_SUCCESS)
+    {
       return status;
     }
   }
   status = arm_mat_trans_f32(&kf->f, &kf->f_t);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&kf->f, &kf->p, &kf->temp_xx_1);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&kf->temp_xx_1, &kf->f_t, &kf->p_minus);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_add_f32(&kf->p_minus, &kf->q, &kf->p_minus);
@@ -213,64 +236,80 @@ arm_status KfPredict(KfObject *kf) {
  * @param z_measurement 观测值指针，如果为NULL则不更新观测值
  * @return 执行状态，ARM_MATH_SUCCESS表示成功，其他值表示失败
  */
-arm_status KfUpdate(KfObject *kf, const float *z_measurement) {
+arm_status KfUpdate(KfObject *kf, const float *z_measurement)
+{
   arm_status status;
-  if ((kf == NULL) || (kf->is_inited == 0U)) {
+  if ((kf == NULL) || (kf->is_inited == 0U))
+  {
     return ARM_MATH_ARGUMENT_ERROR;
   }
-  if (z_measurement != NULL) {
+  if (z_measurement != NULL)
+  {
     KfCopyVector(kf->z_data, z_measurement, kf->z_size);
   }
   status = arm_mat_trans_f32(&kf->h, &kf->h_t);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&kf->h, &kf->p_minus, &kf->temp_zx);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&kf->temp_zx, &kf->h_t, &kf->s);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_add_f32(&kf->s, &kf->r, &kf->s);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_inverse_f32(&kf->s, &kf->temp_zz);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&kf->p_minus, &kf->h_t, &kf->temp_xz);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&kf->temp_xz, &kf->temp_zz, &kf->k);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&kf->h, &kf->xhat_minus, &kf->temp_z1);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_sub_f32(&kf->z, &kf->temp_z1, &kf->temp_z1);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&kf->k, &kf->temp_z1, &kf->temp_x1);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_add_f32(&kf->xhat_minus, &kf->temp_x1, &kf->xhat);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&kf->k, &kf->h, &kf->temp_xx_1);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_sub_f32(&kf->i, &kf->temp_xx_1, &kf->temp_xx_2);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&kf->temp_xx_2, &kf->p_minus, &kf->p);
@@ -283,16 +322,20 @@ arm_status KfUpdate(KfObject *kf, const float *z_measurement) {
  * @param z_measurement 观测值指针，如果为NULL则不更新观测值
  * @return 执行状态，ARM_MATH_SUCCESS表示成功，其他值表示失败
  */
-arm_status KfStep(KfObject *kf, const float *u, const float *z_measurement) {
+arm_status KfStep(KfObject *kf, const float *u, const float *z_measurement)
+{
   arm_status status;
-  if ((kf == NULL) || (kf->is_inited == 0U)) {
+  if ((kf == NULL) || (kf->is_inited == 0U))
+  {
     return ARM_MATH_ARGUMENT_ERROR;
   }
-  if ((u != NULL) && (kf->u_size > 0U)) {
+  if ((u != NULL) && (kf->u_size > 0U))
+  {
     KfCopyVector(kf->u_data, u, kf->u_size);
   }
   status = KfPredict(kf);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   return KfUpdate(kf, z_measurement);

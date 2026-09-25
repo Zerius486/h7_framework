@@ -6,7 +6,8 @@
  * @param q 四元数
  * @return 欧拉角
  */
-Euler QuaternionToEuler(Quaternion q) {
+Euler QuaternionToEuler(Quaternion q)
+{
   Euler euler;
   // 计算roll
   float sr_cp = 2.0f * (q.w * q.x + q.y * q.z);

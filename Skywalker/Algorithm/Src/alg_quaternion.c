@@ -7,7 +7,8 @@
  * @param q2 四元数2
  * @return 乘法结果
  */
-Quaternion QuaternionMultiply(Quaternion q1, Quaternion q2) {
+Quaternion QuaternionMultiply(Quaternion q1, Quaternion q2)
+{
   Quaternion result;
   result.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
   result.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
@@ -20,9 +21,11 @@ Quaternion QuaternionMultiply(Quaternion q1, Quaternion q2) {
  * @param q 输入四元数
  * @return 归一化后的四元数
  */
-Quaternion QuaternionNormalize(Quaternion q) {
+Quaternion QuaternionNormalize(Quaternion q)
+{
   float magnitude = sqrtf(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
-  if (magnitude > 0.0f) {
+  if (magnitude > 0.0f)
+  {
     float inv_mag = 1.0f / magnitude;
     q.w *= inv_mag;
     q.x *= inv_mag;
@@ -36,7 +39,8 @@ Quaternion QuaternionNormalize(Quaternion q) {
  * @param euler 欧拉角
  * @return 转换后的四元数
  */
-Quaternion EulerToQuaternion(Euler euler) {
+Quaternion EulerToQuaternion(Euler euler)
+{
   Quaternion q;
   float cy = cosf(euler.yaw * 0.5f);
   float sy = sinf(euler.yaw * 0.5f);
