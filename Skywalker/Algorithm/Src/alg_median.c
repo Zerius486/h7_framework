@@ -6,8 +6,10 @@
  * @param a 第一个值指针
  * @param b 第二个值指针
  */
-static void MedianSort2(float *a, float *b) {
-  if (*a > *b) {
+static void MedianSort2(float *a, float *b)
+{
+  if (*a > *b)
+  {
     float t = *a;
     *a = *b;
     *b = t;
@@ -18,7 +20,8 @@ static void MedianSort2(float *a, float *b) {
  * @param filter 滤波器对象指针
  * @param initial_value 初始值
  */
-void MedianFilterInit(MedianFilterObject *filter, float initial_value) {
+void MedianFilterInit(MedianFilterObject *filter, float initial_value)
+{
   filter->index = 0;
   memset(filter->buffer, 0, sizeof(filter->buffer));
   filter->buffer[0] = initial_value;
@@ -33,7 +36,8 @@ void MedianFilterInit(MedianFilterObject *filter, float initial_value) {
  * @param value 新输入值
  * @return 当前窗口的中值
  */
-float MedianFilterUpdate(MedianFilterObject *filter, float value) {
+float MedianFilterUpdate(MedianFilterObject *filter, float value)
+{
   filter->buffer[filter->index] = value;
   filter->index = (filter->index + 1) % kMedianWindowSize;
   float s0 = filter->buffer[0];

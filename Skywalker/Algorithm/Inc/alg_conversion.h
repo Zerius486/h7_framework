@@ -9,4 +9,4 @@ float RadianToDegree(float radian);
 float DegreeToRadian(float degree);
 float EncoderToDegree(uint16_t encoder_value);
 uint16_t DegreeToEncoder(float degree);
-#endif  // ALG_CONVERSION_H
+#endif // ALG_CONVERSION_H

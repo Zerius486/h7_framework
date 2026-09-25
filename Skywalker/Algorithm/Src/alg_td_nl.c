@@ -7,7 +7,8 @@
  * @param r 速度因子
  * @param h 滤波因子
  */
-void TdNlInit(TdNlObject *td_nl, float r, float h) {
+void TdNlInit(TdNlObject *td_nl, float r, float h)
+{
   td_nl->x1 = 0.0f;
   td_nl->x2 = 0.0f;
   td_nl->r = r;
@@ -18,7 +19,8 @@ void TdNlInit(TdNlObject *td_nl, float r, float h) {
  * @param x 输入值
  * @return 符号值
  */
-static float SignF(float x) {
+static float SignF(float x)
+{
   if (x > 0.0f)
     return 1.0f;
   else if (x < 0.0f)
@@ -34,7 +36,8 @@ static float SignF(float x) {
  * @param h 滤波因子
  * @return 函数值
  */
-static float Fhan(float x_1, float x_2, float r, float h) {
+static float Fhan(float x_1, float x_2, float r, float h)
+{
   float d = r * h;
   float a_0 = r * h * h;
   float y = x_1 + a_0;
@@ -52,7 +55,8 @@ static float Fhan(float x_1, float x_2, float r, float h) {
  * @param input 当前输入值
  * @param dt 时间步长
  */
-void TdNlUpdate(TdNlObject *td_nl, float input, float dt) {
+void TdNlUpdate(TdNlObject *td_nl, float input, float dt)
+{
   float fh = Fhan(td_nl->x1 - input, td_nl->x2, td_nl->r, td_nl->h);
   float x1_dot = td_nl->x2;
   float x2_dot = -fh;

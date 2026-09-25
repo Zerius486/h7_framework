@@ -26,9 +26,9 @@ D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_selection_sort_f32
 D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_sort_f32.c:50:6:arm_sort_f32	24	static
 D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_sort_init_f32.c:46:6:arm_sort_init_f32	16	static
 D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_weighted_sum_f32.c:158:11:arm_weighted_sum_f32	48	static
-D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_float_to_q15.c:216:6:arm_float_to_q15	48	static
+D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_float_to_q15.c:216:6:arm_float_to_q15	48	static,ignoring_inline_asm
 D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_float_to_q31.c:220:6:arm_float_to_q31	56	static
-D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_float_to_q7.c:240:6:arm_float_to_q7	48	static
+D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_float_to_q7.c:240:6:arm_float_to_q7	48	static,ignoring_inline_asm
 D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_q15_to_float.c:153:6:arm_q15_to_float	32	static
 D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_q15_to_q31.c:97:6:arm_q15_to_q31	32	static
 D:/h7_framework/Drivers/CMSIS/DSP/Source/SupportFunctions/arm_q15_to_q7.c:97:6:arm_q15_to_q7	32	static

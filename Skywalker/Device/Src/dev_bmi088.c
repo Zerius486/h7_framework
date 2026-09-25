@@ -8,7 +8,8 @@
 #include "bsp_spi.h"
 #include "main.h"
 
-enum {
+enum
+{
   kBmi088SpiReadMask = 0x80U,
   kBmi088SpiDummyData = 0x55U,
   kBmi088SpiTimeoutMs = 2U,
@@ -18,7 +19,8 @@ enum {
   kBmi088GyroConfigCount = 6U,
 };
 
-enum {
+enum
+{
   kBmi088AccelChipIdReg = 0x00U,
   kBmi088AccelChipIdValue = 0x1EU,
   kBmi088AccelXoutLReg = 0x12U,
@@ -32,7 +34,8 @@ enum {
   kBmi088AccelSoftResetReg = 0x7EU,
 };
 
-enum {
+enum
+{
   kBmi088GyroChipIdReg = 0x00U,
   kBmi088GyroChipIdValue = 0x0FU,
   kBmi088GyroXoutLReg = 0x02U,
@@ -45,7 +48,8 @@ enum {
   kBmi088GyroIntIoMapReg = 0x18U,
 };
 
-enum {
+enum
+{
   kBmi088AccelPowerOn = 0x04U,
   kBmi088AccelPowerActive = 0x00U,
   kBmi088AccelConfigNormal1600Hz = 0x8CU,
@@ -71,10 +75,11 @@ static const float kBmi088DefaultMotionAccelLpf = 0.0085f;
 static const float kBmi088DefaultGNormMotionThreshold = 0.5f;
 static const float kBmi088DefaultGyroMotionThreshold = 0.15f;
 
-typedef struct {
-  uint8_t reg;         // 寄存器地址
-  uint8_t value;       // 目标配置值
-  Bmi088Status error;  // 配置失败时返回的错误码
+typedef struct
+{
+  uint8_t reg;        // 寄存器地址
+  uint8_t value;      // 目标配置值
+  Bmi088Status error; // 配置失败时返回的错误码
 } Bmi088RegisterConfig;
 
 Bmi088Object g_bmi088 = {0};
@@ -111,8 +116,10 @@ static const Bmi088RegisterConfig kBmi088GyroConfig[kBmi088GyroConfigCount] = {
  * @param config IMU配置结构体指针
  * @param dt EKF采样周期（s）
  */
-void Bmi088ImuConfigInit(Bmi088ImuConfig *config, float dt) {
-  if (config == NULL) {
+void Bmi088ImuConfigInit(Bmi088ImuConfig *config, float dt)
+{
+  if (config == NULL)
+  {
     return;
   }
 
@@ -130,7 +137,8 @@ void Bmi088ImuConfigInit(Bmi088ImuConfig *config, float dt) {
 /**
  * @brief 选中BMI088加速度计片选
  */
-static void Bmi088AccelSelect(void) {
+static void Bmi088AccelSelect(void)
+{
   HAL_GPIO_WritePin(BMI088_ACCEL_CS_GPIO_Port, BMI088_ACCEL_CS_Pin,
                     GPIO_PIN_RESET);
 }
@@ -138,7 +146,8 @@ static void Bmi088AccelSelect(void) {
 /**
  * @brief 释放BMI088加速度计片选
  */
-static void Bmi088AccelDeselect(void) {
+static void Bmi088AccelDeselect(void)
+{
   HAL_GPIO_WritePin(BMI088_ACCEL_CS_GPIO_Port, BMI088_ACCEL_CS_Pin,
                     GPIO_PIN_SET);
 }
@@ -146,7 +155,8 @@ static void Bmi088AccelDeselect(void) {
 /**
  * @brief 选中BMI088陀螺仪片选
  */
-static void Bmi088GyroSelect(void) {
+static void Bmi088GyroSelect(void)
+{
   HAL_GPIO_WritePin(BMI088_GYRO_CS_GPIO_Port, BMI088_GYRO_CS_Pin,
                     GPIO_PIN_RESET);
 }
@@ -154,7 +164,8 @@ static void Bmi088GyroSelect(void) {
 /**
  * @brief 释放BMI088陀螺仪片选
  */
-static void Bmi088GyroDeselect(void) {
+static void Bmi088GyroDeselect(void)
+{
   HAL_GPIO_WritePin(BMI088_GYRO_CS_GPIO_Port, BMI088_GYRO_CS_Pin, GPIO_PIN_SET);
 }
 
@@ -164,7 +175,8 @@ static void Bmi088GyroDeselect(void) {
  * @param data 发送字节
  * @return 接收字节
  */
-static uint8_t Bmi088TransferByte(SPI_HandleTypeDef *hspi, uint8_t data) {
+static uint8_t Bmi088TransferByte(SPI_HandleTypeDef *hspi, uint8_t data)
+{
   uint8_t rx_data = 0;
   (void)SpiTransmitReceiveBlocking(hspi, &data, &rx_data, 1U,
                                    kBmi088SpiTimeoutMs);
@@ -178,7 +190,8 @@ static uint8_t Bmi088TransferByte(SPI_HandleTypeDef *hspi, uint8_t data) {
  * @param data 写入数据
  */
 static void Bmi088WriteRegister(SPI_HandleTypeDef *hspi, uint8_t reg,
-                                uint8_t data) {
+                                uint8_t data)
+{
   uint8_t tx_data[2] = {reg, data};
   uint8_t rx_data[2] = {0};
   (void)SpiTransmitReceiveBlocking(hspi, tx_data, rx_data, sizeof(tx_data),
@@ -191,7 +204,8 @@ static void Bmi088WriteRegister(SPI_HandleTypeDef *hspi, uint8_t reg,
  * @param reg 寄存器地址
  * @return 寄存器值
  */
-static uint8_t Bmi088ReadGyroRegister(SPI_HandleTypeDef *hspi, uint8_t reg) {
+static uint8_t Bmi088ReadGyroRegister(SPI_HandleTypeDef *hspi, uint8_t reg)
+{
   uint8_t tx_data[2] = {reg | kBmi088SpiReadMask, kBmi088SpiDummyData};
   uint8_t rx_data[2] = {0};
   (void)SpiTransmitReceiveBlocking(hspi, tx_data, rx_data, sizeof(tx_data),
@@ -205,7 +219,8 @@ static uint8_t Bmi088ReadGyroRegister(SPI_HandleTypeDef *hspi, uint8_t reg) {
  * @param reg 寄存器地址
  * @return 寄存器值
  */
-static uint8_t Bmi088ReadAccelRegister(SPI_HandleTypeDef *hspi, uint8_t reg) {
+static uint8_t Bmi088ReadAccelRegister(SPI_HandleTypeDef *hspi, uint8_t reg)
+{
   uint8_t value = 0;
 
   (void)Bmi088TransferByte(hspi, reg | kBmi088SpiReadMask);
@@ -223,13 +238,16 @@ static uint8_t Bmi088ReadAccelRegister(SPI_HandleTypeDef *hspi, uint8_t reg) {
  * @param length 读取长度
  */
 static void Bmi088ReadGyroRegisters(SPI_HandleTypeDef *hspi, uint8_t reg,
-                                    uint8_t *data, uint8_t length) {
-  if (data == NULL || length == 0U) {
+                                    uint8_t *data, uint8_t length)
+{
+  if (data == NULL || length == 0U)
+  {
     return;
   }
 
   (void)Bmi088TransferByte(hspi, reg | kBmi088SpiReadMask);
-  for (uint8_t i = 0; i < length; i++) {
+  for (uint8_t i = 0; i < length; i++)
+  {
     data[i] = Bmi088TransferByte(hspi, kBmi088SpiDummyData);
   }
 }
@@ -242,14 +260,17 @@ static void Bmi088ReadGyroRegisters(SPI_HandleTypeDef *hspi, uint8_t reg,
  * @param length 读取长度
  */
 static void Bmi088ReadAccelRegisters(SPI_HandleTypeDef *hspi, uint8_t reg,
-                                     uint8_t *data, uint8_t length) {
-  if (data == NULL || length == 0U) {
+                                     uint8_t *data, uint8_t length)
+{
+  if (data == NULL || length == 0U)
+  {
     return;
   }
 
   (void)Bmi088TransferByte(hspi, reg | kBmi088SpiReadMask);
   (void)Bmi088TransferByte(hspi, kBmi088SpiDummyData);
-  for (uint8_t i = 0; i < length; i++) {
+  for (uint8_t i = 0; i < length; i++)
+  {
     data[i] = Bmi088TransferByte(hspi, kBmi088SpiDummyData);
   }
 }
@@ -258,7 +279,8 @@ static void Bmi088ReadAccelRegisters(SPI_HandleTypeDef *hspi, uint8_t reg,
  * @brief 带片选控制写加速度计寄存器
  */
 static void Bmi088AccelWrite(SPI_HandleTypeDef *hspi, uint8_t reg,
-                             uint8_t data) {
+                             uint8_t data)
+{
   Bmi088AccelSelect();
   Bmi088WriteRegister(hspi, reg, data);
   Bmi088AccelDeselect();
@@ -267,7 +289,8 @@ static void Bmi088AccelWrite(SPI_HandleTypeDef *hspi, uint8_t reg,
 /**
  * @brief 带片选控制读加速度计寄存器
  */
-static uint8_t Bmi088AccelRead(SPI_HandleTypeDef *hspi, uint8_t reg) {
+static uint8_t Bmi088AccelRead(SPI_HandleTypeDef *hspi, uint8_t reg)
+{
   Bmi088AccelSelect();
   uint8_t value = Bmi088ReadAccelRegister(hspi, reg);
   Bmi088AccelDeselect();
@@ -278,7 +301,8 @@ static uint8_t Bmi088AccelRead(SPI_HandleTypeDef *hspi, uint8_t reg) {
  * @brief 带片选控制连续读加速度计寄存器
  */
 static void Bmi088AccelReadMulti(SPI_HandleTypeDef *hspi, uint8_t reg,
-                                 uint8_t *data, uint8_t length) {
+                                 uint8_t *data, uint8_t length)
+{
   Bmi088AccelSelect();
   Bmi088ReadAccelRegisters(hspi, reg, data, length);
   Bmi088AccelDeselect();
@@ -288,7 +312,8 @@ static void Bmi088AccelReadMulti(SPI_HandleTypeDef *hspi, uint8_t reg,
  * @brief 带片选控制写陀螺仪寄存器
  */
 static void Bmi088GyroWrite(SPI_HandleTypeDef *hspi, uint8_t reg,
-                            uint8_t data) {
+                            uint8_t data)
+{
   Bmi088GyroSelect();
   Bmi088WriteRegister(hspi, reg, data);
   Bmi088GyroDeselect();
@@ -297,7 +322,8 @@ static void Bmi088GyroWrite(SPI_HandleTypeDef *hspi, uint8_t reg,
 /**
  * @brief 带片选控制读陀螺仪寄存器
  */
-static uint8_t Bmi088GyroRead(SPI_HandleTypeDef *hspi, uint8_t reg) {
+static uint8_t Bmi088GyroRead(SPI_HandleTypeDef *hspi, uint8_t reg)
+{
   Bmi088GyroSelect();
   uint8_t value = Bmi088ReadGyroRegister(hspi, reg);
   Bmi088GyroDeselect();
@@ -308,7 +334,8 @@ static uint8_t Bmi088GyroRead(SPI_HandleTypeDef *hspi, uint8_t reg) {
  * @brief 带片选控制连续读陀螺仪寄存器
  */
 static void Bmi088GyroReadMulti(SPI_HandleTypeDef *hspi, uint8_t reg,
-                                uint8_t *data, uint8_t length) {
+                                uint8_t *data, uint8_t length)
+{
   Bmi088GyroSelect();
   Bmi088ReadGyroRegisters(hspi, reg, data, length);
   Bmi088GyroDeselect();
@@ -319,7 +346,8 @@ static void Bmi088GyroReadMulti(SPI_HandleTypeDef *hspi, uint8_t reg,
  * @param hspi SPI句柄
  * @return 初始化状态
  */
-static Bmi088Status Bmi088InitAccel(SPI_HandleTypeDef *hspi) {
+static Bmi088Status Bmi088InitAccel(SPI_HandleTypeDef *hspi)
+{
   uint8_t chip_id = Bmi088AccelRead(hspi, kBmi088AccelChipIdReg);
   HAL_Delay(kBmi088ComWaitMs);
   chip_id = Bmi088AccelRead(hspi, kBmi088AccelChipIdReg);
@@ -332,16 +360,19 @@ static Bmi088Status Bmi088InitAccel(SPI_HandleTypeDef *hspi) {
   HAL_Delay(kBmi088ComWaitMs);
   chip_id = Bmi088AccelRead(hspi, kBmi088AccelChipIdReg);
   HAL_Delay(kBmi088ComWaitMs);
-  if (chip_id != kBmi088AccelChipIdValue) {
+  if (chip_id != kBmi088AccelChipIdValue)
+  {
     return kBmi088NoSensor;
   }
 
-  for (uint8_t i = 0; i < kBmi088AccelConfigCount; i++) {
+  for (uint8_t i = 0; i < kBmi088AccelConfigCount; i++)
+  {
     Bmi088AccelWrite(hspi, kBmi088AccelConfig[i].reg,
                      kBmi088AccelConfig[i].value);
     HAL_Delay(kBmi088ComWaitMs);
     if (Bmi088AccelRead(hspi, kBmi088AccelConfig[i].reg) !=
-        kBmi088AccelConfig[i].value) {
+        kBmi088AccelConfig[i].value)
+    {
       return kBmi088AccelConfig[i].error;
     }
   }
@@ -354,7 +385,8 @@ static Bmi088Status Bmi088InitAccel(SPI_HandleTypeDef *hspi) {
  * @param hspi SPI句柄
  * @return 初始化状态
  */
-static Bmi088Status Bmi088InitGyro(SPI_HandleTypeDef *hspi) {
+static Bmi088Status Bmi088InitGyro(SPI_HandleTypeDef *hspi)
+{
   uint8_t chip_id = Bmi088GyroRead(hspi, kBmi088GyroChipIdReg);
   HAL_Delay(kBmi088ComWaitMs);
   chip_id = Bmi088GyroRead(hspi, kBmi088GyroChipIdReg);
@@ -367,15 +399,18 @@ static Bmi088Status Bmi088InitGyro(SPI_HandleTypeDef *hspi) {
   HAL_Delay(kBmi088ComWaitMs);
   chip_id = Bmi088GyroRead(hspi, kBmi088GyroChipIdReg);
   HAL_Delay(kBmi088ComWaitMs);
-  if (chip_id != kBmi088GyroChipIdValue) {
+  if (chip_id != kBmi088GyroChipIdValue)
+  {
     return kBmi088NoSensor;
   }
 
-  for (uint8_t i = 0; i < kBmi088GyroConfigCount; i++) {
+  for (uint8_t i = 0; i < kBmi088GyroConfigCount; i++)
+  {
     Bmi088GyroWrite(hspi, kBmi088GyroConfig[i].reg, kBmi088GyroConfig[i].value);
     HAL_Delay(kBmi088ComWaitMs);
     if (Bmi088GyroRead(hspi, kBmi088GyroConfig[i].reg) !=
-        kBmi088GyroConfig[i].value) {
+        kBmi088GyroConfig[i].value)
+    {
       return kBmi088GyroConfig[i].error;
     }
   }
@@ -389,7 +424,8 @@ static Bmi088Status Bmi088InitGyro(SPI_HandleTypeDef *hspi) {
  * @param high 高字节
  * @return 合成后的有符号整数
  */
-static int16_t Bmi088BytesToInt16(uint8_t low, uint8_t high) {
+static int16_t Bmi088BytesToInt16(uint8_t low, uint8_t high)
+{
   return (int16_t)((uint16_t)low | ((uint16_t)high << 8));
 }
 
@@ -398,7 +434,8 @@ static int16_t Bmi088BytesToInt16(uint8_t low, uint8_t high) {
  * @param vector 三维向量
  * @return 向量模长
  */
-static float Bmi088VectorNorm3(const float vector[3]) {
+static float Bmi088VectorNorm3(const float vector[3])
+{
   return sqrtf(vector[0] * vector[0] + vector[1] * vector[1] +
                vector[2] * vector[2]);
 }
@@ -410,10 +447,12 @@ static float Bmi088VectorNorm3(const float vector[3]) {
  * @param output 输出三轴数据
  */
 static void Bmi088ApplyInstallMatrix(const float matrix[9],
-                                     const float input[3], float output[3]) {
+                                     const float input[3], float output[3])
+{
   float temp[3] = {0.0f, 0.0f, 0.0f};
 
-  for (uint8_t row = 0; row < 3U; row++) {
+  for (uint8_t row = 0; row < 3U; row++)
+  {
     temp[row] = matrix[row * 3U + 0U] * input[0] +
                 matrix[row * 3U + 1U] * input[1] +
                 matrix[row * 3U + 2U] * input[2];
@@ -428,7 +467,8 @@ static void Bmi088ApplyInstallMatrix(const float matrix[9],
  * @param earth_vector 地面系向量
  */
 static void Bmi088BodyToEarth(const Euler *euler, const float body_vector[3],
-                              float earth_vector[3]) {
+                              float earth_vector[3])
+{
   float sin_roll = sinf(euler->roll);
   float cos_roll = cosf(euler->roll);
   float sin_pitch = sinf(euler->pitch);
@@ -456,7 +496,8 @@ static void Bmi088BodyToEarth(const Euler *euler, const float body_vector[3],
  * @param body_vector 机体系向量
  */
 static void Bmi088EarthToBody(const Euler *euler, const float earth_vector[3],
-                              float body_vector[3]) {
+                              float body_vector[3])
+{
   float sin_roll = sinf(euler->roll);
   float cos_roll = cosf(euler->roll);
   float sin_pitch = sinf(euler->pitch);
@@ -481,7 +522,8 @@ static void Bmi088EarthToBody(const Euler *euler, const float earth_vector[3],
  * @brief 读取加速度计原始数据
  * @param bmi088 BMI088对象指针
  */
-static void Bmi088ReadRawAccel(Bmi088Object *bmi088) {
+static void Bmi088ReadRawAccel(Bmi088Object *bmi088)
+{
   uint8_t data[6] = {0};
   Bmi088AccelReadMulti(bmi088->hspi, kBmi088AccelXoutLReg, data, sizeof(data));
   bmi088->raw.accel[0] = Bmi088BytesToInt16(data[0], data[1]);
@@ -493,10 +535,12 @@ static void Bmi088ReadRawAccel(Bmi088Object *bmi088) {
  * @brief 读取陀螺仪原始数据
  * @param bmi088 BMI088对象指针
  */
-static void Bmi088ReadRawGyro(Bmi088Object *bmi088) {
+static void Bmi088ReadRawGyro(Bmi088Object *bmi088)
+{
   uint8_t data[8] = {0};
   Bmi088GyroReadMulti(bmi088->hspi, kBmi088GyroChipIdReg, data, sizeof(data));
-  if (data[0] != kBmi088GyroChipIdValue) {
+  if (data[0] != kBmi088GyroChipIdValue)
+  {
     return;
   }
 
@@ -509,13 +553,15 @@ static void Bmi088ReadRawGyro(Bmi088Object *bmi088) {
  * @brief 读取温度原始数据
  * @param bmi088 BMI088对象指针
  */
-static void Bmi088ReadRawTemperature(Bmi088Object *bmi088) {
+static void Bmi088ReadRawTemperature(Bmi088Object *bmi088)
+{
   uint8_t data[2] = {0};
   int16_t temperature = 0;
 
   Bmi088AccelReadMulti(bmi088->hspi, kBmi088TempMReg, data, sizeof(data));
   temperature = (int16_t)(((uint16_t)data[0] << 3) | ((uint16_t)data[1] >> 5));
-  if (temperature > 1023) {
+  if (temperature > 1023)
+  {
     temperature -= 2048;
   }
   bmi088->raw.temperature = temperature;
@@ -525,8 +571,10 @@ static void Bmi088ReadRawTemperature(Bmi088Object *bmi088) {
  * @brief 将BMI088原始数据转换为物理量
  * @param bmi088 BMI088对象指针
  */
-static void Bmi088UpdateScaledData(Bmi088Object *bmi088) {
-  for (uint8_t i = 0; i < 3U; i++) {
+static void Bmi088UpdateScaledData(Bmi088Object *bmi088)
+{
+  for (uint8_t i = 0; i < 3U; i++)
+  {
     bmi088->accel[i] =
         bmi088->accel_sensitivity * bmi088->accel_scale * bmi088->raw.accel[i];
     bmi088->gyro[i] =
@@ -540,7 +588,8 @@ static void Bmi088UpdateScaledData(Bmi088Object *bmi088) {
  * @brief 更新安装误差修正后的IMU数据
  * @param bmi088 BMI088对象指针
  */
-static void Bmi088UpdateCorrectedData(Bmi088Object *bmi088) {
+static void Bmi088UpdateCorrectedData(Bmi088Object *bmi088)
+{
   Bmi088ApplyInstallMatrix(bmi088->install_matrix, bmi088->accel,
                            bmi088->corrected_accel);
   Bmi088ApplyInstallMatrix(bmi088->install_matrix, bmi088->gyro,
@@ -551,19 +600,22 @@ static void Bmi088UpdateCorrectedData(Bmi088Object *bmi088) {
  * @brief 根据当前姿态扣除重力并更新运动加速度
  * @param bmi088 BMI088对象指针
  */
-static void Bmi088UpdateMotionAccel(Bmi088Object *bmi088) {
+static void Bmi088UpdateMotionAccel(Bmi088Object *bmi088)
+{
   float gravity_earth[3] = {0.0f, 0.0f, bmi088->imu_ekf.gravity};
   float gravity_body[3] = {0.0f, 0.0f, 0.0f};
   float motion_body_raw[3] = {0.0f, 0.0f, 0.0f};
   float alpha = 1.0f;
 
   Bmi088EarthToBody(&bmi088->euler, gravity_earth, gravity_body);
-  if (bmi088->motion_accel_lpf > 0.0f && bmi088->imu_ekf.dt > 0.0f) {
+  if (bmi088->motion_accel_lpf > 0.0f && bmi088->imu_ekf.dt > 0.0f)
+  {
     alpha =
         bmi088->imu_ekf.dt / (bmi088->motion_accel_lpf + bmi088->imu_ekf.dt);
   }
 
-  for (uint8_t i = 0; i < 3U; i++) {
+  for (uint8_t i = 0; i < 3U; i++)
+  {
     motion_body_raw[i] = bmi088->corrected_accel[i] - gravity_body[i];
     bmi088->motion_accel_body[i] =
         alpha * motion_body_raw[i] +
@@ -581,23 +633,29 @@ static void Bmi088UpdateMotionAccel(Bmi088Object *bmi088) {
  */
 static void Bmi088InitEulerFromAccel(Bmi088Object *bmi088,
                                      uint16_t sample_count,
-                                     uint32_t sample_delay_ms) {
+                                     uint32_t sample_delay_ms)
+{
   float accel_sum[3] = {0.0f, 0.0f, 0.0f};
 
-  if (sample_count == 0U) {
+  if (sample_count == 0U)
+  {
     return;
   }
 
-  for (uint16_t sample = 0; sample < sample_count; sample++) {
+  for (uint16_t sample = 0; sample < sample_count; sample++)
+  {
     (void)Bmi088Update(bmi088);
-    for (uint8_t i = 0; i < 3U; i++) {
+    for (uint8_t i = 0; i < 3U; i++)
+    {
       accel_sum[i] += bmi088->corrected_accel[i];
     }
-    if (sample_delay_ms > 0U) {
+    if (sample_delay_ms > 0U)
+    {
       HAL_Delay(sample_delay_ms);
     }
   }
-  for (uint8_t i = 0; i < 3U; i++) {
+  for (uint8_t i = 0; i < 3U; i++)
+  {
     accel_sum[i] /= (float)sample_count;
   }
 
@@ -614,8 +672,10 @@ static void Bmi088InitEulerFromAccel(Bmi088Object *bmi088,
  * @param hspi SPI句柄
  * @return 初始化状态
  */
-Bmi088Status Bmi088Init(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi) {
-  if (bmi088 == NULL || hspi == NULL) {
+Bmi088Status Bmi088Init(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi)
+{
+  if (bmi088 == NULL || hspi == NULL)
+  {
     return kBmi088NoSensor;
   }
 
@@ -634,12 +694,14 @@ Bmi088Status Bmi088Init(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi) {
   Bmi088GyroDeselect();
 
   bmi088->status = Bmi088InitAccel(hspi);
-  if (bmi088->status != kBmi088NoError) {
+  if (bmi088->status != kBmi088NoError)
+  {
     return bmi088->status;
   }
 
   bmi088->status = Bmi088InitGyro(hspi);
-  if (bmi088->status != kBmi088NoError) {
+  if (bmi088->status != kBmi088NoError)
+  {
     return bmi088->status;
   }
 
@@ -652,8 +714,10 @@ Bmi088Status Bmi088Init(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi) {
  * @param bmi088 BMI088对象指针
  * @return 更新状态
  */
-Bmi088Status Bmi088Update(Bmi088Object *bmi088) {
-  if (bmi088 == NULL || !bmi088->is_inited) {
+Bmi088Status Bmi088Update(Bmi088Object *bmi088)
+{
+  if (bmi088 == NULL || !bmi088->is_inited)
+  {
     return kBmi088NoSensor;
   }
 
@@ -674,17 +738,21 @@ Bmi088Status Bmi088Update(Bmi088Object *bmi088) {
  * @return 初始化状态
  */
 Bmi088Status Bmi088ImuInit(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi,
-                           const Bmi088ImuConfig *config) {
-  if (bmi088 == NULL || hspi == NULL || config == NULL) {
+                           const Bmi088ImuConfig *config)
+{
+  if (bmi088 == NULL || hspi == NULL || config == NULL)
+  {
     return kBmi088NoSensor;
   }
 
   Bmi088Status status = Bmi088Init(bmi088, hspi);
-  if (status != kBmi088NoError) {
+  if (status != kBmi088NoError)
+  {
     return status;
   }
 
-  if (ImuEkfInit(&bmi088->imu_ekf, config->dt, config->gravity) != 0) {
+  if (ImuEkfInit(&bmi088->imu_ekf, config->dt, config->gravity) != 0)
+  {
     bmi088->status = kBmi088ImuEkfInitError;
     return bmi088->status;
   }
@@ -696,7 +764,8 @@ Bmi088Status Bmi088ImuInit(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi,
                                  ? config->motion_accel_lpf
                                  : kBmi088DefaultMotionAccelLpf;
 
-  if (config->is_auto_calibrate_enabled) {
+  if (config->is_auto_calibrate_enabled)
+  {
     uint16_t sample_count = (config->calibration_sample_count > 0U)
                                 ? config->calibration_sample_count
                                 : 600U;
@@ -709,13 +778,15 @@ Bmi088Status Bmi088ImuInit(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi,
     status = Bmi088ImuCalibrate(bmi088, sample_count,
                                 config->calibration_sample_delay_ms,
                                 g_threshold, gyro_threshold);
-    if (status != kBmi088NoError) {
+    if (status != kBmi088NoError)
+    {
       bmi088->status = status;
       return status;
     }
   }
 
-  if (config->is_init_euler_from_accel_enabled) {
+  if (config->is_init_euler_from_accel_enabled)
+  {
     uint16_t sample_count = (config->init_euler_sample_count > 0U)
                                 ? config->init_euler_sample_count
                                 : 100U;
@@ -723,8 +794,10 @@ Bmi088Status Bmi088ImuInit(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi,
                              config->init_euler_sample_delay_ms);
   }
 
-  if (config->is_heater_enabled) {
-    if (config->heater_htim == NULL || config->heater_pid_config == NULL) {
+  if (config->is_heater_enabled)
+  {
+    if (config->heater_htim == NULL || config->heater_pid_config == NULL)
+    {
       bmi088->status = kBmi088HeaterConfigError;
       return bmi088->status;
     }
@@ -742,24 +815,29 @@ Bmi088Status Bmi088ImuInit(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi,
  * @param bmi088 BMI088对象指针
  * @return 更新状态
  */
-Bmi088Status Bmi088ImuUpdate(Bmi088Object *bmi088) {
-  if (bmi088 == NULL || !bmi088->is_inited || !bmi088->is_imu_enabled) {
+Bmi088Status Bmi088ImuUpdate(Bmi088Object *bmi088)
+{
+  if (bmi088 == NULL || !bmi088->is_inited || !bmi088->is_imu_enabled)
+  {
     return kBmi088NoSensor;
   }
 
   Bmi088Status status = Bmi088Update(bmi088);
-  if (status != kBmi088NoError) {
+  if (status != kBmi088NoError)
+  {
     bmi088->status = status;
     return status;
   }
 
-  if (bmi088->is_heater_enabled) {
+  if (bmi088->is_heater_enabled)
+  {
     bmi088->heater_duty_ratio = Bmi088HeaterControl(bmi088);
   }
 
   bmi088->imu_ekf_status = ImuEkfStep(&bmi088->imu_ekf, bmi088->corrected_gyro,
                                       bmi088->corrected_accel);
-  if (bmi088->imu_ekf_status != ARM_MATH_SUCCESS) {
+  if (bmi088->imu_ekf_status != ARM_MATH_SUCCESS)
+  {
     bmi088->status = kBmi088ImuEkfUpdateError;
     return bmi088->status;
   }
@@ -777,8 +855,10 @@ Bmi088Status Bmi088ImuUpdate(Bmi088Object *bmi088) {
  * @brief 重置BMI088内部IMU EKF状态
  * @param bmi088 BMI088对象指针
  */
-void Bmi088ImuReset(Bmi088Object *bmi088) {
-  if (bmi088 == NULL || !bmi088->is_imu_enabled) {
+void Bmi088ImuReset(Bmi088Object *bmi088)
+{
+  if (bmi088 == NULL || !bmi088->is_imu_enabled)
+  {
     return;
   }
 
@@ -801,8 +881,10 @@ void Bmi088ImuReset(Bmi088Object *bmi088) {
  */
 void Bmi088ImuSetEkfQr(Bmi088Object *bmi088,
                        const float q_diag[kEkfImuStateSize],
-                       const float r_diag[kEkfImuMeasSize]) {
-  if (bmi088 == NULL || !bmi088->is_imu_enabled) {
+                       const float r_diag[kEkfImuMeasSize])
+{
+  if (bmi088 == NULL || !bmi088->is_imu_enabled)
+  {
     return;
   }
 
@@ -815,17 +897,22 @@ void Bmi088ImuSetEkfQr(Bmi088Object *bmi088,
  * @param install_matrix 3x3安装矩阵，传NULL则恢复单位阵
  */
 void Bmi088ImuSetInstallMatrix(Bmi088Object *bmi088,
-                               const float install_matrix[9]) {
-  if (bmi088 == NULL) {
+                               const float install_matrix[9])
+{
+  if (bmi088 == NULL)
+  {
     return;
   }
 
   memset(bmi088->install_matrix, 0, sizeof(bmi088->install_matrix));
-  if (install_matrix == NULL) {
+  if (install_matrix == NULL)
+  {
     bmi088->install_matrix[0] = 1.0f;
     bmi088->install_matrix[4] = 1.0f;
     bmi088->install_matrix[8] = 1.0f;
-  } else {
+  }
+  else
+  {
     memcpy(bmi088->install_matrix, install_matrix,
            sizeof(bmi088->install_matrix));
   }
@@ -836,8 +923,10 @@ void Bmi088ImuSetInstallMatrix(Bmi088Object *bmi088,
  * @param bmi088 BMI088对象指针
  * @param lpf 低通时间常数（s），小于等于0表示不滤波
  */
-void Bmi088ImuSetMotionAccelLpf(Bmi088Object *bmi088, float lpf) {
-  if (bmi088 == NULL) {
+void Bmi088ImuSetMotionAccelLpf(Bmi088Object *bmi088, float lpf)
+{
+  if (bmi088 == NULL)
+  {
     return;
   }
   bmi088->motion_accel_lpf = lpf;
@@ -855,7 +944,8 @@ void Bmi088ImuSetMotionAccelLpf(Bmi088Object *bmi088, float lpf) {
 Bmi088Status Bmi088ImuCalibrate(Bmi088Object *bmi088, uint16_t sample_count,
                                 uint32_t sample_delay_ms,
                                 float g_norm_motion_threshold,
-                                float gyro_motion_threshold) {
+                                float gyro_motion_threshold)
+{
   float gyro_sum[3] = {0.0f, 0.0f, 0.0f};
   float gyro_min[3] = {0.0f, 0.0f, 0.0f};
   float gyro_max[3] = {0.0f, 0.0f, 0.0f};
@@ -863,7 +953,8 @@ Bmi088Status Bmi088ImuCalibrate(Bmi088Object *bmi088, uint16_t sample_count,
   float g_norm_min = 0.0f;
   float g_norm_max = 0.0f;
 
-  if (bmi088 == NULL || !bmi088->is_inited || sample_count == 0U) {
+  if (bmi088 == NULL || !bmi088->is_inited || sample_count == 0U)
+  {
     return kBmi088NoSensor;
   }
 
@@ -871,11 +962,13 @@ Bmi088Status Bmi088ImuCalibrate(Bmi088Object *bmi088, uint16_t sample_count,
   memset(bmi088->gyro_offset, 0, sizeof(bmi088->gyro_offset));
   memset(&bmi088->calibration, 0, sizeof(bmi088->calibration));
 
-  for (uint16_t sample = 0; sample < sample_count; sample++) {
+  for (uint16_t sample = 0; sample < sample_count; sample++)
+  {
     (void)Bmi088Update(bmi088);
     float g_norm = Bmi088VectorNorm3(bmi088->corrected_accel);
 
-    if (sample == 0U) {
+    if (sample == 0U)
+    {
       g_norm_min = g_norm;
       g_norm_max = g_norm;
       memcpy(gyro_min, bmi088->corrected_gyro, sizeof(gyro_min));
@@ -883,22 +976,30 @@ Bmi088Status Bmi088ImuCalibrate(Bmi088Object *bmi088, uint16_t sample_count,
     }
 
     g_norm_sum += g_norm;
-    if (g_norm < g_norm_min) {
+    if (g_norm < g_norm_min)
+    {
       g_norm_min = g_norm;
-    } else if (g_norm > g_norm_max) {
+    }
+    else if (g_norm > g_norm_max)
+    {
       g_norm_max = g_norm;
     }
 
-    for (uint8_t i = 0; i < 3U; i++) {
+    for (uint8_t i = 0; i < 3U; i++)
+    {
       gyro_sum[i] += bmi088->corrected_gyro[i];
-      if (bmi088->corrected_gyro[i] < gyro_min[i]) {
+      if (bmi088->corrected_gyro[i] < gyro_min[i])
+      {
         gyro_min[i] = bmi088->corrected_gyro[i];
-      } else if (bmi088->corrected_gyro[i] > gyro_max[i]) {
+      }
+      else if (bmi088->corrected_gyro[i] > gyro_max[i])
+      {
         gyro_max[i] = bmi088->corrected_gyro[i];
       }
     }
 
-    if (sample_delay_ms > 0U) {
+    if (sample_delay_ms > 0U)
+    {
       HAL_Delay(sample_delay_ms);
     }
   }
@@ -907,7 +1008,8 @@ Bmi088Status Bmi088ImuCalibrate(Bmi088Object *bmi088, uint16_t sample_count,
   bmi088->calibration.g_norm = g_norm_sum / (float)sample_count;
   bmi088->calibration.g_norm_range = g_norm_max - g_norm_min;
   bmi088->calibration.temperature_when_cali = bmi088->temperature;
-  for (uint8_t i = 0; i < 3U; i++) {
+  for (uint8_t i = 0; i < 3U; i++)
+  {
     bmi088->calibration.gyro_range[i] = gyro_max[i] - gyro_min[i];
   }
 
@@ -915,12 +1017,14 @@ Bmi088Status Bmi088ImuCalibrate(Bmi088Object *bmi088, uint16_t sample_count,
                    bmi088->calibration.gyro_range[0] > gyro_motion_threshold ||
                    bmi088->calibration.gyro_range[1] > gyro_motion_threshold ||
                    bmi088->calibration.gyro_range[2] > gyro_motion_threshold;
-  if (is_moving || bmi088->calibration.g_norm <= 0.0f) {
+  if (is_moving || bmi088->calibration.g_norm <= 0.0f)
+  {
     bmi088->status = kBmi088CalibrateMotionError;
     return bmi088->status;
   }
 
-  for (uint8_t i = 0; i < 3U; i++) {
+  for (uint8_t i = 0; i < 3U; i++)
+  {
     bmi088->gyro_offset[i] = gyro_sum[i] / (float)sample_count;
   }
   bmi088->g_norm = bmi088->calibration.g_norm;
@@ -937,8 +1041,10 @@ Bmi088Status Bmi088ImuCalibrate(Bmi088Object *bmi088, uint16_t sample_count,
  * @param bmi088 BMI088对象指针
  * @param gyro_offset 三轴陀螺仪零偏（rad/s）
  */
-void Bmi088SetGyroOffset(Bmi088Object *bmi088, const float gyro_offset[3]) {
-  if (bmi088 == NULL || gyro_offset == NULL) {
+void Bmi088SetGyroOffset(Bmi088Object *bmi088, const float gyro_offset[3])
+{
+  if (bmi088 == NULL || gyro_offset == NULL)
+  {
     return;
   }
 
@@ -955,25 +1061,31 @@ void Bmi088SetGyroOffset(Bmi088Object *bmi088, const float gyro_offset[3]) {
  */
 Bmi088Status Bmi088CalibrateGyroOffset(Bmi088Object *bmi088,
                                        uint16_t sample_count,
-                                       uint32_t sample_delay_ms) {
+                                       uint32_t sample_delay_ms)
+{
   float gyro_sum[3] = {0.0f, 0.0f, 0.0f};
 
-  if (bmi088 == NULL || !bmi088->is_inited || sample_count == 0U) {
+  if (bmi088 == NULL || !bmi088->is_inited || sample_count == 0U)
+  {
     return kBmi088NoSensor;
   }
 
   memset(bmi088->gyro_offset, 0, sizeof(bmi088->gyro_offset));
-  for (uint16_t sample = 0; sample < sample_count; sample++) {
+  for (uint16_t sample = 0; sample < sample_count; sample++)
+  {
     Bmi088ReadRawGyro(bmi088);
-    for (uint8_t i = 0; i < 3U; i++) {
+    for (uint8_t i = 0; i < 3U; i++)
+    {
       gyro_sum[i] += bmi088->gyro_sensitivity * bmi088->raw.gyro[i];
     }
-    if (sample_delay_ms > 0U) {
+    if (sample_delay_ms > 0U)
+    {
       HAL_Delay(sample_delay_ms);
     }
   }
 
-  for (uint8_t i = 0; i < 3U; i++) {
+  for (uint8_t i = 0; i < 3U; i++)
+  {
     bmi088->gyro_offset[i] = gyro_sum[i] / (float)sample_count;
   }
   bmi088->is_gyro_offset_inited = true;
@@ -991,8 +1103,10 @@ Bmi088Status Bmi088CalibrateGyroOffset(Bmi088Object *bmi088,
  */
 void Bmi088HeaterInit(Bmi088Object *bmi088, TIM_HandleTypeDef *htim,
                       uint32_t channel, PidConfig *pid_config,
-                      float target_temperature) {
-  if (bmi088 == NULL || htim == NULL || pid_config == NULL) {
+                      float target_temperature)
+{
+  if (bmi088 == NULL || htim == NULL || pid_config == NULL)
+  {
     return;
   }
 
@@ -1009,12 +1123,15 @@ void Bmi088HeaterInit(Bmi088Object *bmi088, TIM_HandleTypeDef *htim,
  * @brief 关闭BMI088恒温加热控制
  * @param bmi088 BMI088对象指针
  */
-void Bmi088HeaterDisable(Bmi088Object *bmi088) {
-  if (bmi088 == NULL) {
+void Bmi088HeaterDisable(Bmi088Object *bmi088)
+{
+  if (bmi088 == NULL)
+  {
     return;
   }
 
-  if (bmi088->heater_htim != NULL) {
+  if (bmi088->heater_htim != NULL)
+  {
     PwmSetDutyRatio(bmi088->heater_htim, bmi088->heater_channel, 0.0f);
   }
   bmi088->heater_duty_ratio = 0.0f;
@@ -1026,17 +1143,22 @@ void Bmi088HeaterDisable(Bmi088Object *bmi088) {
  * @param bmi088 BMI088对象指针
  * @return 输出PWM占空比
  */
-float Bmi088HeaterControl(Bmi088Object *bmi088) {
-  if (bmi088 == NULL || !bmi088->is_heater_enabled) {
+float Bmi088HeaterControl(Bmi088Object *bmi088)
+{
+  if (bmi088 == NULL || !bmi088->is_heater_enabled)
+  {
     return 0.0f;
   }
 
   float duty_ratio =
       PidCalculate(&bmi088->heater_pid, bmi088->heater_target_temperature,
                    bmi088->temperature);
-  if (duty_ratio < 0.0f) {
+  if (duty_ratio < 0.0f)
+  {
     duty_ratio = 0.0f;
-  } else if (duty_ratio > 1.0f) {
+  }
+  else if (duty_ratio > 1.0f)
+  {
     duty_ratio = 1.0f;
   }
   PwmSetDutyRatio(bmi088->heater_htim, bmi088->heater_channel, duty_ratio);

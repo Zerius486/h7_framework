@@ -65,11 +65,13 @@ uint16_t crc16_table[256] = {
  * @param len 数据长度
  * @return CRC8校验值
  */
-uint8_t GetCrc8(uint8_t *data, uint16_t len) {
+uint8_t GetCrc8(uint8_t *data, uint16_t len)
+{
   uint8_t crc8 = crc8_init;
   uint8_t byte;
   uint8_t i;
-  while (len--) {
+  while (len--)
+  {
     byte = *data++;
     i = (uint8_t)((crc8 ^ byte) & 0xFFU);
     crc8 = (uint8_t)(crc8_table[i]);
@@ -82,11 +84,13 @@ uint8_t GetCrc8(uint8_t *data, uint16_t len) {
  * @param len 数据长度
  * @return CRC16校验值
  */
-uint16_t GetCrc16(uint8_t *data, uint16_t len) {
+uint16_t GetCrc16(uint8_t *data, uint16_t len)
+{
   uint16_t crc16 = crc16_init;
   uint8_t byte;
   uint8_t i;
-  while (len--) {
+  while (len--)
+  {
     byte = *data++;
     i = (uint8_t)((crc16 ^ byte) & 0xFFU);
     crc16 = (uint16_t)((crc16 >> 8) ^ crc16_table[i]);
@@ -99,7 +103,8 @@ uint16_t GetCrc16(uint8_t *data, uint16_t len) {
  * @param len 数据长度
  * @return 校验结果
  */
-bool CheckCrc8(uint8_t *data, uint16_t len) {
+bool CheckCrc8(uint8_t *data, uint16_t len)
+{
   return GetCrc8(data, len - 1) == data[len - 1];
 }
 /**
@@ -108,6 +113,7 @@ bool CheckCrc8(uint8_t *data, uint16_t len) {
  * @param len 数据长度
  * @return 校验结果
  */
-bool CheckCrc16(uint8_t *data, uint16_t len) {
+bool CheckCrc16(uint8_t *data, uint16_t len)
+{
   return GetCrc16(data, len - 2) == ((data[len - 1] << 8) | data[len - 2]);
 }
