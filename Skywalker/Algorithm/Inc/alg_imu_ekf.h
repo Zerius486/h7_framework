@@ -3,33 +3,35 @@
 #include "alg_euler.h"
 #include "arm_math.h"
 
-enum {
+enum
+{
   kEkfImuStateSize = 6U,
   kEkfImuMeasSize = 3U,
   kEkfImuInputSize = 3U,
 };
 
 // imu_ekf结构体
-typedef struct {
+typedef struct
+{
   float dt;
   float gravity;
   uint8_t is_inited;
-  arm_matrix_instance_f32 x;        // 当前状态
-  arm_matrix_instance_f32 x_minus;  // 预测状态
-  arm_matrix_instance_f32 p;        // 当前协方差
-  arm_matrix_instance_f32 p_minus;  // 预测协方差
-  arm_matrix_instance_f32 f;        // 状态雅可比 F
-  arm_matrix_instance_f32 f_t;      // F 转置
-  arm_matrix_instance_f32 h;        // 观测雅可比 H
-  arm_matrix_instance_f32 h_t;      // H 转置
-  arm_matrix_instance_f32 q;        // 过程噪声
-  arm_matrix_instance_f32 r;        // 观测噪声
-  arm_matrix_instance_f32 k;        // 卡尔曼增益
-  arm_matrix_instance_f32 s;        // 创新协方差
-  arm_matrix_instance_f32 i;        // 单位阵
-  arm_matrix_instance_f32 z;        // 观测向量
-  arm_matrix_instance_f32 z_pred;   // 预测观测
-  arm_matrix_instance_f32 y;        // 创新向量
+  arm_matrix_instance_f32 x;       // 当前状态
+  arm_matrix_instance_f32 x_minus; // 预测状态
+  arm_matrix_instance_f32 p;       // 当前协方差
+  arm_matrix_instance_f32 p_minus; // 预测协方差
+  arm_matrix_instance_f32 f;       // 状态雅可比 F
+  arm_matrix_instance_f32 f_t;     // F 转置
+  arm_matrix_instance_f32 h;       // 观测雅可比 H
+  arm_matrix_instance_f32 h_t;     // H 转置
+  arm_matrix_instance_f32 q;       // 过程噪声
+  arm_matrix_instance_f32 r;       // 观测噪声
+  arm_matrix_instance_f32 k;       // 卡尔曼增益
+  arm_matrix_instance_f32 s;       // 创新协方差
+  arm_matrix_instance_f32 i;       // 单位阵
+  arm_matrix_instance_f32 z;       // 观测向量
+  arm_matrix_instance_f32 z_pred;  // 预测观测
+  arm_matrix_instance_f32 y;       // 创新向量
   arm_matrix_instance_f32 temp_xx_1;
   arm_matrix_instance_f32 temp_xx_2;
   arm_matrix_instance_f32 temp_xz;
@@ -72,4 +74,4 @@ void ImuEkfGetEuler(const ImuEkfObject *ekf, float *roll, float *pitch,
 void ImuEkfGetGyroBias(const ImuEkfObject *ekf, float bias[kEkfImuInputSize]);
 void ImuEkfGetState(const ImuEkfObject *ekf, Euler *euler,
                     EulerRate *euler_rate);
-#endif  // ALG_IMU_EKF_H
+#endif // ALG_IMU_EKF_H

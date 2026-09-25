@@ -12,4 +12,4 @@ uint8_t GetCrc8(uint8_t *data, uint16_t len);
 uint16_t GetCrc16(uint8_t *data, uint16_t len);
 bool CheckCrc8(uint8_t *data, uint16_t len);
 bool CheckCrc16(uint8_t *data, uint16_t len);
-#endif  // ALG_CRC_H
+#endif // ALG_CRC_H

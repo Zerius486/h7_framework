@@ -4,13 +4,13 @@ D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:417:19:H
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:516:10:HAL_PWREx_GetVoltageRange	4	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:542:19:HAL_PWREx_ControlStopModeVoltageScaling	16	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:557:10:HAL_PWREx_GetStopModeVoltageRange	4	static
-D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:820:6:HAL_PWREx_EnterSTOPMode	24	static
-D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:943:6:HAL_PWREx_ClearPendingEvent	4	static
-D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:990:6:HAL_PWREx_EnterSTANDBYMode	16	static
+D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:820:6:HAL_PWREx_EnterSTOPMode	24	static,ignoring_inline_asm
+D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:943:6:HAL_PWREx_ClearPendingEvent	4	static,ignoring_inline_asm
+D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:990:6:HAL_PWREx_EnterSTANDBYMode	16	static,ignoring_inline_asm
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:1085:6:HAL_PWREx_ConfigD3Domain	16	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:1216:6:HAL_PWREx_EnableFlashPowerDown	4	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:1230:6:HAL_PWREx_DisableFlashPowerDown	4	static
-D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:1306:6:HAL_PWREx_EnableWakeUpPin	80	static
+D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:1306:6:HAL_PWREx_EnableWakeUpPin	80	static,ignoring_inline_asm
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:1348:6:HAL_PWREx_DisableWakeUpPin	16	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:1373:10:HAL_PWREx_GetWakeupFlag	16	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c:1398:19:HAL_PWREx_ClearWakeupFlag	16	static

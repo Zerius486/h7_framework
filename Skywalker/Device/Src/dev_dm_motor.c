@@ -9,11 +9,14 @@
  * @param max 最大值
  * @return 限幅后的数值
  */
-static float DmMotorClamp(float value, float min, float max) {
-  if (value > max) {
+static float DmMotorClamp(float value, float min, float max)
+{
+  if (value > max)
+  {
     return max;
   }
-  if (value < min) {
+  if (value < min)
+  {
     return min;
   }
   return value;
@@ -28,7 +31,8 @@ static float DmMotorClamp(float value, float min, float max) {
  * @return 映射后的整数值
  */
 static uint16_t DmMotorFloatToUint(float value, float min, float max,
-                                   uint8_t bits) {
+                                   uint8_t bits)
+{
   value = DmMotorClamp(value, min, max);
   float span = max - min;
   uint32_t max_int = (1UL << bits) - 1UL;
@@ -44,7 +48,8 @@ static uint16_t DmMotorFloatToUint(float value, float min, float max,
  * @return 反映射后的物理量
  */
 static float DmMotorUintToFloat(uint16_t value, float min, float max,
-                                uint8_t bits) {
+                                uint8_t bits)
+{
   float span = max - min;
   uint32_t max_int = (1UL << bits) - 1UL;
   return (float)value * span / (float)max_int + min;
@@ -55,8 +60,10 @@ static float DmMotorUintToFloat(uint16_t value, float min, float max,
  * @param value 输入浮点数
  * @param tx_data 输出数据缓冲区，长度至少4字节
  */
-static void DmMotorPackFloat(float value, uint8_t tx_data[4]) {
-  union {
+static void DmMotorPackFloat(float value, uint8_t tx_data[4])
+{
+  union
+  {
     float value;
     uint8_t bytes[4];
   } converter = {.value = value};
@@ -72,7 +79,8 @@ static void DmMotorPackFloat(float value, uint8_t tx_data[4]) {
  * @param torque_nm 目标力矩（Nm）
  * @return 电流单位值
  */
-float DmMotorTorqueToCurrentUnits(float torque_nm) {
+float DmMotorTorqueToCurrentUnits(float torque_nm)
+{
   float torque = DmMotorClamp(torque_nm, kDmMotorTorqueMin, kDmMotorTorqueMax);
   return torque * kDmMotorCurrentUnitsMax / kDmMotorTorqueMax;
 }
@@ -82,7 +90,8 @@ float DmMotorTorqueToCurrentUnits(float torque_nm) {
  * @param current_units 电流单位值
  * @return 估计力矩（Nm）
  */
-float DmMotorCurrentUnitsToTorque(float current_units) {
+float DmMotorCurrentUnitsToTorque(float current_units)
+{
   float current = DmMotorClamp(current_units, -kDmMotorCurrentUnitsMax,
                                kDmMotorCurrentUnitsMax);
   return current * kDmMotorTorqueMax / kDmMotorCurrentUnitsMax;
@@ -93,8 +102,10 @@ float DmMotorCurrentUnitsToTorque(float current_units) {
  * @param motor 达妙电机对象指针
  * @return 发送CAN ID，参数无效时返回0
  */
-uint32_t DmMotorTxId(const DmMotor *motor) {
-  if (motor == NULL) {
+uint32_t DmMotorTxId(const DmMotor *motor)
+{
+  if (motor == NULL)
+  {
     return 0U;
   }
   return motor->state.id + (uint32_t)motor->mode;
@@ -109,8 +120,10 @@ uint32_t DmMotorTxId(const DmMotor *motor) {
  * @param master_id 电机反馈ID
  */
 void DmMotorInit(DmMotor *motor, DmMotorType type, DmMotorMode mode,
-                 uint32_t id, uint32_t master_id) {
-  if (motor == NULL) {
+                 uint32_t id, uint32_t master_id)
+{
+  if (motor == NULL)
+  {
     return;
   }
 
@@ -128,8 +141,10 @@ void DmMotorInit(DmMotor *motor, DmMotorType type, DmMotorMode mode,
  * @param motor 达妙电机对象指针
  * @param rx_data CAN反馈数据，长度8字节
  */
-void DmMotorUpdate(DmMotor *motor, const uint8_t rx_data[8]) {
-  if (motor == NULL || rx_data == NULL) {
+void DmMotorUpdate(DmMotor *motor, const uint8_t rx_data[8])
+{
+  if (motor == NULL || rx_data == NULL)
+  {
     return;
   }
 
@@ -159,17 +174,22 @@ void DmMotorUpdate(DmMotor *motor, const uint8_t rx_data[8]) {
  * @param tx_data 输出数据缓冲区，长度8字节
  */
 void DmMotorPackCommand(DmMotor *motor, DmMotorCommand command,
-                        uint8_t tx_data[8]) {
-  if (motor == NULL || tx_data == NULL) {
+                        uint8_t tx_data[8])
+{
+  if (motor == NULL || tx_data == NULL)
+  {
     return;
   }
 
   memset(tx_data, 0xFF, 7);
   tx_data[7] = (uint8_t)command;
 
-  if (command == kDmMotorCommandEnable) {
+  if (command == kDmMotorCommandEnable)
+  {
     motor->state.is_enabled = true;
-  } else if (command == kDmMotorCommandDisable) {
+  }
+  else if (command == kDmMotorCommandDisable)
+  {
     motor->state.is_enabled = false;
   }
 }
@@ -179,7 +199,8 @@ void DmMotorPackCommand(DmMotor *motor, DmMotorCommand command,
  * @param motor 达妙电机对象指针
  * @param tx_data 输出数据缓冲区，长度8字节
  */
-void DmMotorPackEnable(DmMotor *motor, uint8_t tx_data[8]) {
+void DmMotorPackEnable(DmMotor *motor, uint8_t tx_data[8])
+{
   DmMotorPackCommand(motor, kDmMotorCommandEnable, tx_data);
 }
 
@@ -188,7 +209,8 @@ void DmMotorPackEnable(DmMotor *motor, uint8_t tx_data[8]) {
  * @param motor 达妙电机对象指针
  * @param tx_data 输出数据缓冲区，长度8字节
  */
-void DmMotorPackDisable(DmMotor *motor, uint8_t tx_data[8]) {
+void DmMotorPackDisable(DmMotor *motor, uint8_t tx_data[8])
+{
   DmMotorPackCommand(motor, kDmMotorCommandDisable, tx_data);
 }
 
@@ -197,7 +219,8 @@ void DmMotorPackDisable(DmMotor *motor, uint8_t tx_data[8]) {
  * @param motor 达妙电机对象指针
  * @param tx_data 输出数据缓冲区，长度8字节
  */
-void DmMotorPackZeroOffset(DmMotor *motor, uint8_t tx_data[8]) {
+void DmMotorPackZeroOffset(DmMotor *motor, uint8_t tx_data[8])
+{
   DmMotorPackCommand(motor, kDmMotorCommandZeroOffset, tx_data);
 }
 
@@ -206,7 +229,8 @@ void DmMotorPackZeroOffset(DmMotor *motor, uint8_t tx_data[8]) {
  * @param motor 达妙电机对象指针
  * @param tx_data 输出数据缓冲区，长度8字节
  */
-void DmMotorPackClearError(DmMotor *motor, uint8_t tx_data[8]) {
+void DmMotorPackClearError(DmMotor *motor, uint8_t tx_data[8])
+{
   DmMotorPackCommand(motor, kDmMotorCommandClearError, tx_data);
 }
 
@@ -215,8 +239,10 @@ void DmMotorPackClearError(DmMotor *motor, uint8_t tx_data[8]) {
  * @param motor 达妙电机对象指针
  * @param tx_data 输出数据缓冲区，长度8字节
  */
-void DmMotorPackMit(const DmMotor *motor, uint8_t tx_data[8]) {
-  if (motor == NULL || tx_data == NULL) {
+void DmMotorPackMit(const DmMotor *motor, uint8_t tx_data[8])
+{
+  if (motor == NULL || tx_data == NULL)
+  {
     return;
   }
 
@@ -246,8 +272,10 @@ void DmMotorPackMit(const DmMotor *motor, uint8_t tx_data[8]) {
  * @param motor 达妙电机对象指针
  * @param tx_data 输出数据缓冲区，长度8字节
  */
-void DmMotorPackPositionVelocity(const DmMotor *motor, uint8_t tx_data[8]) {
-  if (motor == NULL || tx_data == NULL) {
+void DmMotorPackPositionVelocity(const DmMotor *motor, uint8_t tx_data[8])
+{
+  if (motor == NULL || tx_data == NULL)
+  {
     return;
   }
 
@@ -260,8 +288,10 @@ void DmMotorPackPositionVelocity(const DmMotor *motor, uint8_t tx_data[8]) {
  * @param motor 达妙电机对象指针
  * @param tx_data 输出数据缓冲区，长度8字节
  */
-void DmMotorPackVelocity(const DmMotor *motor, uint8_t tx_data[8]) {
-  if (motor == NULL || tx_data == NULL) {
+void DmMotorPackVelocity(const DmMotor *motor, uint8_t tx_data[8])
+{
+  if (motor == NULL || tx_data == NULL)
+  {
     return;
   }
 
@@ -274,8 +304,10 @@ void DmMotorPackVelocity(const DmMotor *motor, uint8_t tx_data[8]) {
  * @param motor 达妙电机对象指针
  * @param tx_data 输出数据缓冲区，长度8字节
  */
-void DmMotorPackForcePosition(const DmMotor *motor, uint8_t tx_data[8]) {
-  if (motor == NULL || tx_data == NULL) {
+void DmMotorPackForcePosition(const DmMotor *motor, uint8_t tx_data[8])
+{
+  if (motor == NULL || tx_data == NULL)
+  {
     return;
   }
 

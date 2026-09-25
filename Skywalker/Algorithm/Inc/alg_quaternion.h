@@ -1,7 +1,8 @@
 #ifndef ALG_QUATERNION_H
 #define ALG_QUATERNION_H
 // 四元数结构体
-typedef struct {
+typedef struct
+{
   float w;
   float x;
   float y;
@@ -11,4 +12,4 @@ typedef struct {
 Quaternion QuaternionMultiply(Quaternion q1, Quaternion q2);
 Quaternion QuaternionNormalize(Quaternion q);
 Quaternion EulerToQuaternion(Euler euler);
-#endif  // ALG_QUATERNION_H
+#endif // ALG_QUATERNION_H

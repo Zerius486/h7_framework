@@ -19,7 +19,8 @@ float RadSToRpm(float rad_s) { return rad_s * 30.0f / M_PI; }
  * @param encoder_value 编码器原始值
  * @return 弧度制角度值
  */
-float EncoderToRadian(uint16_t encoder_value) {
+float EncoderToRadian(uint16_t encoder_value)
+{
   return (float)(encoder_value) / 8192.0f * 2.0f * M_PI;
 }
 /**
@@ -27,7 +28,8 @@ float EncoderToRadian(uint16_t encoder_value) {
  * @param radian 弧度制角度值
  * @return 编码器值
  */
-uint16_t RadianToEncoder(float radian) {
+uint16_t RadianToEncoder(float radian)
+{
   return (uint16_t)((radian / (2.0f * M_PI)) * 8192.0f);
 }
 /**
@@ -47,7 +49,8 @@ float DegreeToRadian(float degree) { return degree * M_PI / 180.0f; }
  * @param encoder_value 编码器原始值
  * @return 角度制角度值
  */
-float EncoderToDegree(uint16_t encoder_value) {
+float EncoderToDegree(uint16_t encoder_value)
+{
   return (float)(encoder_value) / 8192.0f * 360.0f;
 }
 /**
@@ -55,6 +58,7 @@ float EncoderToDegree(uint16_t encoder_value) {
  * @param degree 角度制角度值
  * @return 编码器值
  */
-uint16_t DegreeToEncoder(float degree) {
+uint16_t DegreeToEncoder(float degree)
+{
   return (uint16_t)(degree * 8192.0f / 360.0f);
 }

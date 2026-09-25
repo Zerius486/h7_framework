@@ -7,15 +7,18 @@
 #include "stm32h7xx_hal.h"
 
 // SPI对象实例
-SpiObject g_spi_object[kSpiNbr] = {0};
+SpiObject g_spi_object[kSpiNbr]
+    __attribute__((section(".dma_buffer"), aligned(32))) = {0};
 
 /**
  * @brief 获取SPI对象实例索引
  * @param hspi SPI句柄
  * @return SPI对象实例索引，0xFF表示无效索引
  */
-static uint8_t SpiIndex(SPI_HandleTypeDef *hspi) {
-  if (hspi == &hspi2) {
+static uint8_t SpiIndex(SPI_HandleTypeDef *hspi)
+{
+  if (hspi == &hspi2)
+  {
     return 0;
   }
   return 0xFF;
@@ -26,9 +29,11 @@ static uint8_t SpiIndex(SPI_HandleTypeDef *hspi) {
  * @param hspi SPI句柄
  * @param callback 接收回调函数指针
  */
-void SpiInit(SPI_HandleTypeDef *hspi, SpiRxCallback callback) {
+void SpiInit(SPI_HandleTypeDef *hspi, SpiRxCallback callback)
+{
   uint32_t index = SpiIndex(hspi);
-  if (index == 0xFFU) {
+  if (index == 0xFFU)
+  {
     return;
   }
 
@@ -46,10 +51,12 @@ void SpiInit(SPI_HandleTypeDef *hspi, SpiRxCallback callback) {
  * @param length 数据长度
  */
 void SpiTransmitReceive(SPI_HandleTypeDef *hspi, uint8_t *tx_data,
-                        uint8_t *rx_data, uint16_t length) {
+                        uint8_t *rx_data, uint16_t length)
+{
   uint32_t index = SpiIndex(hspi);
   if (index == 0xFFU || tx_data == NULL || length == 0U ||
-      length > kSpiBufferSize || hspi->State != HAL_SPI_STATE_READY) {
+      length > kSpiBufferSize || hspi->State != HAL_SPI_STATE_READY)
+  {
     return;
   }
 
@@ -63,10 +70,12 @@ void SpiTransmitReceive(SPI_HandleTypeDef *hspi, uint8_t *tx_data,
 HAL_StatusTypeDef SpiTransmitReceiveBlocking(SPI_HandleTypeDef *hspi,
                                              uint8_t *tx_data, uint8_t *rx_data,
                                              uint16_t length,
-                                             uint32_t timeout) {
+                                             uint32_t timeout)
+{
   uint32_t index = SpiIndex(hspi);
   if (index == 0xFFU || tx_data == NULL || rx_data == NULL || length == 0U ||
-      length > kSpiBufferSize) {
+      length > kSpiBufferSize)
+  {
     return HAL_ERROR;
   }
 
@@ -77,19 +86,23 @@ HAL_StatusTypeDef SpiTransmitReceiveBlocking(SPI_HandleTypeDef *hspi,
  * @brief HAL库 SPI传输完成回调函数
  * @param hspi SPI句柄
  */
-void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
+{
   uint32_t index = SpiIndex(hspi);
-  if (index == 0xFFU) {
+  if (index == 0xFFU)
+  {
     return;
   }
 
   uint16_t transfer_length = g_spi_object[index].transfer_length;
-  if (g_spi_object[index].rx_buffer_user != NULL && transfer_length > 0U) {
+  if (g_spi_object[index].rx_buffer_user != NULL && transfer_length > 0U)
+  {
     memcpy(g_spi_object[index].rx_buffer_user, g_spi_object[index].rx_buffer,
            transfer_length);
   }
 
-  if (g_spi_object[index].callback != NULL) {
+  if (g_spi_object[index].callback != NULL)
+  {
     g_spi_object[index].callback(g_spi_object[index].rx_buffer,
                                  transfer_length);
   }
@@ -102,9 +115,11 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
  * @brief HAL库 SPI错误回调函数
  * @param hspi SPI句柄
  */
-void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi) {
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
+{
   uint32_t index = SpiIndex(hspi);
-  if (index == 0xFFU) {
+  if (index == 0xFFU)
+  {
     return;
   }
 

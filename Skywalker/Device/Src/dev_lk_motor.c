@@ -7,14 +7,17 @@
  * @param current_units 输入电流单位值
  * @return 限幅后的电流单位值
  */
-static int16_t LkMotorClampCurrent(int16_t current_units) {
+static int16_t LkMotorClampCurrent(int16_t current_units)
+{
   const int16_t kMinCurrent = -2000;
   const int16_t kMaxCurrent = 2000;
 
-  if (current_units > kMaxCurrent) {
+  if (current_units > kMaxCurrent)
+  {
     return kMaxCurrent;
   }
-  if (current_units < kMinCurrent) {
+  if (current_units < kMinCurrent)
+  {
     return kMinCurrent;
   }
   return current_units;
@@ -25,8 +28,10 @@ static int16_t LkMotorClampCurrent(int16_t current_units) {
  * @param motor LK电机对象指针
  * @return 反馈CAN ID，参数无效时返回0
  */
-uint32_t LkMotorFeedbackId(const LkMotor *motor) {
-  if (motor == NULL) {
+uint32_t LkMotorFeedbackId(const LkMotor *motor)
+{
+  if (motor == NULL)
+  {
     return 0U;
   }
   return kLkMotorFeedbackBaseId + (uint32_t)motor->state.id;
@@ -37,8 +42,10 @@ uint32_t LkMotorFeedbackId(const LkMotor *motor) {
  * @param motor LK电机对象指针
  * @param id 电机ID，范围1~4
  */
-void LkMotorInit(LkMotor *motor, uint8_t id) {
-  if (motor == NULL) {
+void LkMotorInit(LkMotor *motor, uint8_t id)
+{
+  if (motor == NULL)
+  {
     return;
   }
 
@@ -52,8 +59,10 @@ void LkMotorInit(LkMotor *motor, uint8_t id) {
  * @param motor LK电机对象指针
  * @param rx_data CAN反馈数据，长度8字节
  */
-void LkMotorUpdate(LkMotor *motor, const uint8_t rx_data[8]) {
-  if (motor == NULL || rx_data == NULL) {
+void LkMotorUpdate(LkMotor *motor, const uint8_t rx_data[8])
+{
+  if (motor == NULL || rx_data == NULL)
+  {
     return;
   }
 
@@ -64,9 +73,12 @@ void LkMotorUpdate(LkMotor *motor, const uint8_t rx_data[8]) {
   // 通过编码器跨半圈阈值判断溢出方向，得到连续累计角度。
   int32_t delta =
       (int32_t)motor->state.encoder - (int32_t)motor->state.last_encoder;
-  if (delta > 32768) {
+  if (delta > 32768)
+  {
     motor->state.total_round--;
-  } else if (delta < -32768) {
+  }
+  else if (delta < -32768)
+  {
     motor->state.total_round++;
   }
 
@@ -91,8 +103,10 @@ void LkMotorUpdate(LkMotor *motor, const uint8_t rx_data[8]) {
  * @param motor LK电机对象指针
  * @param current_units 目标电流单位值
  */
-void LkMotorSetCurrentUnits(LkMotor *motor, int16_t current_units) {
-  if (motor == NULL) {
+void LkMotorSetCurrentUnits(LkMotor *motor, int16_t current_units)
+{
+  if (motor == NULL)
+  {
     return;
   }
   motor->state.given_current_units = LkMotorClampCurrent(current_units);
@@ -102,8 +116,10 @@ void LkMotorSetCurrentUnits(LkMotor *motor, int16_t current_units) {
  * @brief 使能LK电机控制输出
  * @param motor LK电机对象指针
  */
-void LkMotorEnable(LkMotor *motor) {
-  if (motor != NULL) {
+void LkMotorEnable(LkMotor *motor)
+{
+  if (motor != NULL)
+  {
     motor->state.is_enabled = true;
   }
 }
@@ -112,8 +128,10 @@ void LkMotorEnable(LkMotor *motor) {
  * @brief 失能LK电机控制输出并清零目标电流
  * @param motor LK电机对象指针
  */
-void LkMotorDisable(LkMotor *motor) {
-  if (motor != NULL) {
+void LkMotorDisable(LkMotor *motor)
+{
+  if (motor != NULL)
+  {
     motor->state.is_enabled = false;
     motor->state.given_current_units = 0;
   }
@@ -126,20 +144,25 @@ void LkMotorDisable(LkMotor *motor) {
  * @param tx_data 输出数据缓冲区，长度8字节
  */
 void LkMotorPackCurrentGroup(LkMotor *const motors[], uint8_t motor_count,
-                             uint8_t tx_data[8]) {
-  if (tx_data == NULL) {
+                             uint8_t tx_data[8])
+{
+  if (tx_data == NULL)
+  {
     return;
   }
 
   memset(tx_data, 0, 8);
-  if (motors == NULL) {
+  if (motors == NULL)
+  {
     return;
   }
 
-  for (uint8_t i = 0; i < motor_count; i++) {
+  for (uint8_t i = 0; i < motor_count; i++)
+  {
     LkMotor *motor = motors[i];
     if (motor == NULL || motor->state.id == 0U ||
-        motor->state.id > kLkMotorMaxGroupCount) {
+        motor->state.id > kLkMotorMaxGroupCount)
+    {
       continue;
     }
 
@@ -159,12 +182,15 @@ void LkMotorPackCurrentGroup(LkMotor *const motors[], uint8_t motor_count,
  * @param tx_data 输出数据缓冲区，长度8字节
  */
 void LkMotorPackCurrentUnits4(const int16_t current_units[4],
-                              uint8_t tx_data[8]) {
-  if (current_units == NULL || tx_data == NULL) {
+                              uint8_t tx_data[8])
+{
+  if (current_units == NULL || tx_data == NULL)
+  {
     return;
   }
 
-  for (uint8_t i = 0; i < kLkMotorMaxGroupCount; i++) {
+  for (uint8_t i = 0; i < kLkMotorMaxGroupCount; i++)
+  {
     int16_t current = LkMotorClampCurrent(current_units[i]);
     tx_data[i * 2U] = (uint8_t)(current & 0xFF);
     tx_data[i * 2U + 1U] = (uint8_t)((uint16_t)current >> 8);

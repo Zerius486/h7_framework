@@ -18,4 +18,4 @@ D:/h7_framework/Drivers/CMSIS/DSP/Source/FastMathFunctions/arm_vlog_q15.c:58:17:
 D:/h7_framework/Drivers/CMSIS/DSP/Source/FastMathFunctions/arm_vlog_q15.c:223:6:arm_vlog_q15	32	static
 D:/h7_framework/Drivers/CMSIS/DSP/Source/FastMathFunctions/arm_atan2_f32.c:132:12:arm_atan2_f32	136	static
 D:/h7_framework/Drivers/CMSIS/DSP/Source/FastMathFunctions/arm_atan2_q31.c:151:12:arm_atan2_q31	544	static
-D:/h7_framework/Drivers/CMSIS/DSP/Source/FastMathFunctions/arm_atan2_q15.c:150:12:arm_atan2_q15	192	static
+D:/h7_framework/Drivers/CMSIS/DSP/Source/FastMathFunctions/arm_atan2_q15.c:150:12:arm_atan2_q15	192	static,ignoring_inline_asm
