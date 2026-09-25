@@ -7,10 +7,12 @@
  * @param data 目标矩阵数据指针
  * @param size 矩阵阶数
  */
-static void EkfSetIdentity(float *data, uint16_t size) {
+static void EkfSetIdentity(float *data, uint16_t size)
+{
   uint16_t i;
   memset(data, 0, (uint32_t)size * size * sizeof(float));
-  for (i = 0; i < size; i++) {
+  for (i = 0; i < size; i++)
+  {
     data[(uint32_t)i * size + i] = 1.0f;
   }
 }
@@ -19,11 +21,14 @@ static void EkfSetIdentity(float *data, uint16_t size) {
  * @param x 输入角度
  * @return 归一化后的角度
  */
-static float EkfWrapPi(float x) {
-  while (x > M_PI) {
+static float EkfWrapPi(float x)
+{
+  while (x > M_PI)
+  {
     x -= 2.0f * M_PI;
   }
-  while (x < -M_PI) {
+  while (x < -M_PI)
+  {
     x += 2.0f * M_PI;
   }
   return x;
@@ -33,11 +38,15 @@ static float EkfWrapPi(float x) {
  * @param x 输入角度
  * @return 保护后的cos值
  */
-static float EkfSafeCos(float x) {
+static float EkfSafeCos(float x)
+{
   float c = cosf(x);
-  if (c > 0.0f && c < 1e-4f) {
+  if (c > 0.0f && c < 1e-4f)
+  {
     c = 1e-4f;
-  } else if (c < 0.0f && c > -1e-4f) {
+  }
+  else if (c < 0.0f && c > -1e-4f)
+  {
     c = -1e-4f;
   }
   return c;
@@ -48,7 +57,8 @@ static float EkfSafeCos(float x) {
  * @param gyro 陀螺仪输入
  */
 static void EkfPredictModelAndJacobian(ImuEkfObject *ekf,
-                                       const float gyro[kEkfImuInputSize]) {
+                                       const float gyro[kEkfImuInputSize])
+{
   float *x = ekf->x_data;
   float *x_minus = ekf->x_minus_data;
   float *f = ekf->f_data;
@@ -93,7 +103,8 @@ static void EkfPredictModelAndJacobian(ImuEkfObject *ekf,
  * @brief 观测模型与观测雅可比
  * @param ekf ekf对象指针
  */
-static void EkfMeasurementModelAndJacobian(ImuEkfObject *ekf) {
+static void EkfMeasurementModelAndJacobian(ImuEkfObject *ekf)
+{
   float *x_minus = ekf->x_minus_data;
   float *z_pred = ekf->z_pred_data;
   float *h = ekf->h_data;
@@ -121,9 +132,11 @@ static void EkfMeasurementModelAndJacobian(ImuEkfObject *ekf) {
  * @param gravity 重力常数
  * @return 0表示成功，-1表示失败
  */
-int8_t ImuEkfInit(ImuEkfObject *ekf, float dt, float gravity) {
+int8_t ImuEkfInit(ImuEkfObject *ekf, float dt, float gravity)
+{
   uint8_t i;
-  if ((ekf == NULL) || (dt <= 0.0f)) {
+  if ((ekf == NULL) || (dt <= 0.0f))
+  {
     return -1;
   }
   memset(ekf, 0, sizeof(*ekf));
@@ -162,10 +175,12 @@ int8_t ImuEkfInit(ImuEkfObject *ekf, float dt, float gravity) {
   EkfSetIdentity(ekf->p_data, kEkfImuStateSize);
   memset(ekf->q_data, 0, sizeof(ekf->q_data));
   memset(ekf->r_data, 0, sizeof(ekf->r_data));
-  for (i = 0; i < kEkfImuStateSize; i++) {
+  for (i = 0; i < kEkfImuStateSize; i++)
+  {
     ekf->q_data[(uint32_t)i * kEkfImuStateSize + i] = (i < 3U) ? 1e-4f : 1e-6f;
   }
-  for (i = 0; i < kEkfImuMeasSize; i++) {
+  for (i = 0; i < kEkfImuMeasSize; i++)
+  {
     ekf->r_data[(uint32_t)i * kEkfImuMeasSize + i] = 0.5f;
   }
   memset(ekf->corrected_gyro_data, 0, sizeof(ekf->corrected_gyro_data));
@@ -176,8 +191,10 @@ int8_t ImuEkfInit(ImuEkfObject *ekf, float dt, float gravity) {
  * @brief 重置EKF状态
  * @param ekf EKF对象指针
  */
-void ImuEkfReset(ImuEkfObject *ekf) {
-  if ((ekf == NULL) || (ekf->is_inited == 0U)) {
+void ImuEkfReset(ImuEkfObject *ekf)
+{
+  if ((ekf == NULL) || (ekf->is_inited == 0U))
+  {
     return;
   }
   memset(ekf->x_data, 0, sizeof(ekf->x_data));
@@ -193,20 +210,26 @@ void ImuEkfReset(ImuEkfObject *ekf) {
  * @param r_diag R对角线，传NULL则不更新
  */
 void ImuEkfSetQr(ImuEkfObject *ekf, const float q_diag[kEkfImuStateSize],
-                 const float r_diag[kEkfImuMeasSize]) {
+                 const float r_diag[kEkfImuMeasSize])
+{
   uint8_t i;
-  if ((ekf == NULL) || (ekf->is_inited == 0U)) {
+  if ((ekf == NULL) || (ekf->is_inited == 0U))
+  {
     return;
   }
-  if (q_diag != NULL) {
+  if (q_diag != NULL)
+  {
     memset(ekf->q_data, 0, sizeof(ekf->q_data));
-    for (i = 0; i < kEkfImuStateSize; i++) {
+    for (i = 0; i < kEkfImuStateSize; i++)
+    {
       ekf->q_data[(uint32_t)i * kEkfImuStateSize + i] = q_diag[i];
     }
   }
-  if (r_diag != NULL) {
+  if (r_diag != NULL)
+  {
     memset(ekf->r_data, 0, sizeof(ekf->r_data));
-    for (i = 0; i < kEkfImuMeasSize; i++) {
+    for (i = 0; i < kEkfImuMeasSize; i++)
+    {
       ekf->r_data[(uint32_t)i * kEkfImuMeasSize + i] = r_diag[i];
     }
   }
@@ -219,8 +242,10 @@ void ImuEkfSetQr(ImuEkfObject *ekf, const float q_diag[kEkfImuStateSize],
  * @param pitch 俯仰角（rad）
  * @param yaw 偏航角（rad）
  */
-void ImuEkfSetEuler(ImuEkfObject *ekf, float roll, float pitch, float yaw) {
-  if ((ekf == NULL) || (ekf->is_inited == 0U)) {
+void ImuEkfSetEuler(ImuEkfObject *ekf, float roll, float pitch, float yaw)
+{
+  if ((ekf == NULL) || (ekf->is_inited == 0U))
+  {
     return;
   }
 
@@ -239,87 +264,107 @@ void ImuEkfSetEuler(ImuEkfObject *ekf, float roll, float pitch, float yaw) {
  * @return ARM_MATH_SUCCESS表示成功
  */
 arm_status ImuEkfStep(ImuEkfObject *ekf, const float gyro[kEkfImuInputSize],
-                      const float accel[kEkfImuMeasSize]) {
+                      const float accel[kEkfImuMeasSize])
+{
   arm_status status;
   uint8_t i;
   if ((ekf == NULL) || (gyro == NULL) || (accel == NULL) ||
-      (ekf->is_inited == 0U)) {
+      (ekf->is_inited == 0U))
+  {
     return ARM_MATH_ARGUMENT_ERROR;
   }
   EkfPredictModelAndJacobian(ekf, gyro);
   status = arm_mat_trans_f32(&ekf->f, &ekf->f_t);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&ekf->f, &ekf->p, &ekf->temp_xx_1);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&ekf->temp_xx_1, &ekf->f_t, &ekf->p_minus);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_add_f32(&ekf->p_minus, &ekf->q, &ekf->p_minus);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   EkfMeasurementModelAndJacobian(ekf);
-  for (i = 0; i < kEkfImuMeasSize; i++) {
+  for (i = 0; i < kEkfImuMeasSize; i++)
+  {
     ekf->z_data[i] = accel[i];
   }
   status = arm_mat_trans_f32(&ekf->h, &ekf->h_t);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&ekf->h, &ekf->p_minus, &ekf->temp_zx);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&ekf->temp_zx, &ekf->h_t, &ekf->s);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_add_f32(&ekf->s, &ekf->r, &ekf->s);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_inverse_f32(&ekf->s, &ekf->temp_zz);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&ekf->p_minus, &ekf->h_t, &ekf->temp_xz);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&ekf->temp_xz, &ekf->temp_zz, &ekf->k);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_sub_f32(&ekf->z, &ekf->z_pred, &ekf->y);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&ekf->k, &ekf->y, &ekf->temp_x1);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_add_f32(&ekf->x_minus, &ekf->temp_x1, &ekf->x);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   ekf->x_data[0] = EkfWrapPi(ekf->x_data[0]);
   ekf->x_data[1] = EkfWrapPi(ekf->x_data[1]);
   ekf->x_data[2] = EkfWrapPi(ekf->x_data[2]);
   status = arm_mat_mult_f32(&ekf->k, &ekf->h, &ekf->temp_xx_1);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_sub_f32(&ekf->i, &ekf->temp_xx_1, &ekf->temp_xx_2);
-  if (status != ARM_MATH_SUCCESS) {
+  if (status != ARM_MATH_SUCCESS)
+  {
     return status;
   }
   status = arm_mat_mult_f32(&ekf->temp_xx_2, &ekf->p_minus, &ekf->p);
-  if (status == ARM_MATH_SUCCESS) {
+  if (status == ARM_MATH_SUCCESS)
+  {
     ekf->corrected_gyro_data[0] = gyro[0] - ekf->x_data[3];
     ekf->corrected_gyro_data[1] = gyro[1] - ekf->x_data[4];
     ekf->corrected_gyro_data[2] = gyro[2] - ekf->x_data[5];
@@ -334,17 +379,22 @@ arm_status ImuEkfStep(ImuEkfObject *ekf, const float gyro[kEkfImuInputSize],
  * @param yaw 偏航角输出
  */
 void ImuEkfGetEuler(const ImuEkfObject *ekf, float *roll, float *pitch,
-                    float *yaw) {
-  if ((ekf == NULL) || (ekf->is_inited == 0U)) {
+                    float *yaw)
+{
+  if ((ekf == NULL) || (ekf->is_inited == 0U))
+  {
     return;
   }
-  if (roll != NULL) {
+  if (roll != NULL)
+  {
     *roll = ekf->x_data[0];
   }
-  if (pitch != NULL) {
+  if (pitch != NULL)
+  {
     *pitch = ekf->x_data[1];
   }
-  if (yaw != NULL) {
+  if (yaw != NULL)
+  {
     *yaw = ekf->x_data[2];
   }
 }
@@ -353,8 +403,10 @@ void ImuEkfGetEuler(const ImuEkfObject *ekf, float *roll, float *pitch,
  * @param ekf EKF对象指针
  * @param bias 零偏输出
  */
-void ImuEkfGetGyroBias(const ImuEkfObject *ekf, float bias[kEkfImuInputSize]) {
-  if ((ekf == NULL) || (bias == NULL) || (ekf->is_inited == 0U)) {
+void ImuEkfGetGyroBias(const ImuEkfObject *ekf, float bias[kEkfImuInputSize])
+{
+  if ((ekf == NULL) || (bias == NULL) || (ekf->is_inited == 0U))
+  {
     return;
   }
   bias[0] = ekf->x_data[3];
@@ -368,16 +420,20 @@ void ImuEkfGetGyroBias(const ImuEkfObject *ekf, float bias[kEkfImuInputSize]) {
  * @param euler_rate 欧拉角速度输出
  */
 void ImuEkfGetState(const ImuEkfObject *ekf, Euler *euler,
-                    EulerRate *euler_rate) {
-  if ((ekf == NULL) || (ekf->is_inited == 0U)) {
+                    EulerRate *euler_rate)
+{
+  if ((ekf == NULL) || (ekf->is_inited == 0U))
+  {
     return;
   }
-  if (euler != NULL) {
+  if (euler != NULL)
+  {
     euler->roll = ekf->x_data[0];
     euler->pitch = ekf->x_data[1];
     euler->yaw = ekf->x_data[2];
   }
-  if (euler_rate != NULL) {
+  if (euler_rate != NULL)
+  {
     const float phi = ekf->x_data[0];
     const float theta = ekf->x_data[1];
     const float p = ekf->corrected_gyro_data[0];

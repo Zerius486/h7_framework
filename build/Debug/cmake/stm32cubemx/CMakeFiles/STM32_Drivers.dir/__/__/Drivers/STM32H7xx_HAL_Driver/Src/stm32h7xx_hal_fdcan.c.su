@@ -34,7 +34,7 @@ D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:2557:19:H
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:2621:19:HAL_FDCAN_Start	16	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:2652:19:HAL_FDCAN_Stop	24	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:2734:19:HAL_FDCAN_AddMessageToTxFifoQ	32	static
-D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:2813:19:HAL_FDCAN_AddMessageToTxBuffer	56	static
+D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:2813:19:HAL_FDCAN_AddMessageToTxBuffer	56	static,ignoring_inline_asm
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:2882:19:HAL_FDCAN_EnableTxBufferRequest	16	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:2909:10:HAL_FDCAN_GetLatestTxFifoQRequestBuffer	16	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:2923:19:HAL_FDCAN_AbortTxRequest	16	static
@@ -51,7 +51,7 @@ D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:3426:10:H
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:3442:19:HAL_FDCAN_ExitRestrictedOperationMode	24	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:3509:19:HAL_FDCAN_TT_ConfigOperation	32	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:3689:19:HAL_FDCAN_TT_ConfigReferenceMessage	24	static
-D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:3740:19:HAL_FDCAN_TT_ConfigTrigger	48	static
+D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:3740:19:HAL_FDCAN_TT_ConfigTrigger	48	static,ignoring_inline_asm
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:3850:19:HAL_FDCAN_TT_SetGlobalTime	24	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:3924:19:HAL_FDCAN_TT_SetClockSynchronization	24	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c:4000:19:HAL_FDCAN_TT_ConfigStopWatch	32	static
