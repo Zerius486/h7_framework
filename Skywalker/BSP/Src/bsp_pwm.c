@@ -13,8 +13,10 @@ PwmObject g_pwm_object[kPwmChannelNbr] = {0};
  * @param channel 通道
  * @return PWM对象实例索引，0xFF表示无效索引
  */
-uint8_t PwmIndex(TIM_HandleTypeDef *htim, uint32_t channel) {
-  if (htim == &htim3 && channel == TIM_CHANNEL_4) {
+uint8_t PwmIndex(TIM_HandleTypeDef *htim, uint32_t channel)
+{
+  if (htim == &htim3 && channel == TIM_CHANNEL_4)
+  {
     return 0;
   }
   return 0xFF;
@@ -25,16 +27,19 @@ uint8_t PwmIndex(TIM_HandleTypeDef *htim, uint32_t channel) {
  * @param htim TIM句柄
  * @param channel 通道
  */
-void PwmInit(TIM_HandleTypeDef *htim, uint32_t channel) {
+void PwmInit(TIM_HandleTypeDef *htim, uint32_t channel)
+{
   uint32_t index = PwmIndex(htim, channel);
-  if (index == 0xFFU) {
+  if (index == 0xFFU)
+  {
     return;
   }
 
   g_pwm_object[index].htim = htim;
   g_pwm_object[index].channel = channel;
   g_pwm_object[index].arr = __HAL_TIM_GET_AUTORELOAD(htim);
-  if (g_pwm_object[index].arr == 0U) {
+  if (g_pwm_object[index].arr == 0U)
+  {
     g_pwm_object[index].arr = 20000U;
   }
   g_pwm_object[index].ccr = 0U;
@@ -49,15 +54,20 @@ void PwmInit(TIM_HandleTypeDef *htim, uint32_t channel) {
  * @param duty_ratio 占空比
  */
 void PwmSetDutyRatio(TIM_HandleTypeDef *htim, uint32_t channel,
-                     float duty_ratio) {
+                     float duty_ratio)
+{
   uint32_t index = PwmIndex(htim, channel);
-  if (index == 0xFFU) {
+  if (index == 0xFFU)
+  {
     return;
   }
 
-  if (duty_ratio < 0.0f) {
+  if (duty_ratio < 0.0f)
+  {
     duty_ratio = 0.0f;
-  } else if (duty_ratio > 1.0f) {
+  }
+  else if (duty_ratio > 1.0f)
+  {
     duty_ratio = 1.0f;
   }
 

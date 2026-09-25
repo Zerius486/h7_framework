@@ -1,6 +1,6 @@
 D:/h7_framework/Drivers/CMSIS/DSP/Source/ControllerFunctions/arm_pid_init_f32.c:51:6:arm_pid_init_f32	16	static
-D:/h7_framework/Drivers/CMSIS/DSP/Source/ControllerFunctions/arm_pid_init_q15.c:51:6:arm_pid_init_q15	80	static
-D:/h7_framework/Drivers/CMSIS/DSP/Source/ControllerFunctions/arm_pid_init_q31.c:51:6:arm_pid_init_q31	64	static
+D:/h7_framework/Drivers/CMSIS/DSP/Source/ControllerFunctions/arm_pid_init_q15.c:51:6:arm_pid_init_q15	80	static,ignoring_inline_asm
+D:/h7_framework/Drivers/CMSIS/DSP/Source/ControllerFunctions/arm_pid_init_q31.c:51:6:arm_pid_init_q31	64	static,ignoring_inline_asm
 D:/h7_framework/Drivers/CMSIS/DSP/Source/ControllerFunctions/arm_pid_reset_f32.c:45:6:arm_pid_reset_f32	16	static
 D:/h7_framework/Drivers/CMSIS/DSP/Source/ControllerFunctions/arm_pid_reset_q15.c:45:6:arm_pid_reset_q15	16	static
 D:/h7_framework/Drivers/CMSIS/DSP/Source/ControllerFunctions/arm_pid_reset_q31.c:45:6:arm_pid_reset_q31	16	static

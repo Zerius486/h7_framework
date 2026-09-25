@@ -1,5 +1,5 @@
-D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c:160:19:HAL_FLASH_Program	48	static
-D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c:325:19:HAL_FLASH_Program_IT	48	static
+D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c:160:19:HAL_FLASH_Program	48	static,ignoring_inline_asm
+D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c:325:19:HAL_FLASH_Program_IT	48	static,ignoring_inline_asm
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c:481:6:HAL_FLASH_IRQHandler	24	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c:816:13:HAL_FLASH_EndOfOperationCallback	16	static
 D:/h7_framework/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c:834:13:HAL_FLASH_OperationErrorCallback	16	static

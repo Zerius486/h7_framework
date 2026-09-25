@@ -15,32 +15,41 @@ VisionToGimbal g_vision_to_gimbal = {
     .head = {'A', 'B'},
 };
 
-static bool VisionProtocolHeaderIsValid(const uint8_t *data) {
+static bool VisionProtocolHeaderIsValid(const uint8_t *data)
+{
   return data != NULL && data[0] == 'A' && data[1] == 'B';
 }
 
-void VisionProtocolRxCallback(uint8_t *rx_buffer, uint16_t rx_length) {
-  if (rx_buffer == NULL || rx_length == 0U) {
+void VisionProtocolRxCallback(uint8_t *rx_buffer, uint16_t rx_length)
+{
+  if (rx_buffer == NULL || rx_length == 0U)
+  {
     return;
   }
 
   uint16_t offset = 0;
-  while (offset < rx_length) {
+  while (offset < rx_length)
+  {
     uint16_t remaining_length = (uint16_t)(rx_length - offset);
     if (remaining_length >= sizeof(VisionToGimbal) &&
-        VisionProtocolHeaderIsValid(&rx_buffer[offset])) {
-      if (CheckCrc16(&rx_buffer[offset], sizeof(VisionToGimbal))) {
+        VisionProtocolHeaderIsValid(&rx_buffer[offset]))
+    {
+      if (CheckCrc16(&rx_buffer[offset], sizeof(VisionToGimbal)))
+      {
         memcpy(&g_vision_to_gimbal, &rx_buffer[offset],
                sizeof(g_vision_to_gimbal));
       }
       offset = (uint16_t)(offset + sizeof(VisionToGimbal));
-    } else {
+    }
+    else
+    {
       offset++;
     }
   }
 }
 
-void VisionProtocolTransmitGimbalState(void) {
+void VisionProtocolTransmitGimbalState(void)
+{
   g_gimbal_to_vision.head[0] = 'A';
   g_gimbal_to_vision.head[1] = 'B';
 
