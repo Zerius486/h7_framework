@@ -8,8 +8,7 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "toolchainFile": "${sourceDir}/cmake/gcc-arm-none-eabi.cmake",
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "C:/ST/STM32CubeCLT_1.22.0/GNU-tools-for-STM32/bin/arm-none-eabi-gcc.exe",
-                "CMAKE_CXX_COMPILER": "C:/ST/STM32CubeCLT_1.22.0/GNU-tools-for-STM32/bin/arm-none-eabi-g++.exe"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "TRUE"
             }
         },
         {
