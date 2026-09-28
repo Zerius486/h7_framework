@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "bsp_stream.h"
 #include "cmsis_os2.h"
 
 enum
@@ -11,6 +12,9 @@ enum
 
 // DT7 遥控器对象实例
 Dt7Object g_dt7_object;
+static uint8_t g_dt7_rx_stream[18U * 4U];
+static StreamBuffer g_dt7_rx_stream_buffer;
+static bool g_dt7_rx_stream_initialized = false;
 
 /**
  * @brief DT7 遥控器接收回调函数，解析18字节数据包
@@ -19,42 +23,54 @@ Dt7Object g_dt7_object;
  */
 void Dt7RxCallback(uint8_t *rx_buffer, uint16_t length)
 {
-    if (length != kDt7FrameLength || rx_buffer == NULL)
+    if (length == 0U || rx_buffer == NULL)
     {
         return;
     }
 
+    if (!g_dt7_rx_stream_initialized)
+    {
+        StreamBufferInit(&g_dt7_rx_stream_buffer, g_dt7_rx_stream,
+                         sizeof(g_dt7_rx_stream));
+        g_dt7_rx_stream_initialized = true;
+    }
+    StreamBufferAppend(&g_dt7_rx_stream_buffer, rx_buffer, length);
+
+    while (g_dt7_rx_stream_buffer.length >= kDt7FrameLength)
+    {
+        uint8_t *frame = g_dt7_rx_stream_buffer.buffer;
+
     g_dt7_object.rocker.ch0 =
-        (int16_t)(((uint16_t)rx_buffer[0] | ((uint16_t)rx_buffer[1] << 8)) &
+        (int16_t)(((uint16_t)frame[0] | ((uint16_t)frame[1] << 8)) &
                   0x07FFU) -
         (int16_t)kRcChValueOffset;
-    g_dt7_object.rocker.ch1 = (int16_t)((((uint16_t)rx_buffer[1] >> 3) |
-                                         ((uint16_t)rx_buffer[2] << 5)) &
+    g_dt7_object.rocker.ch1 = (int16_t)((((uint16_t)frame[1] >> 3) |
+                                         ((uint16_t)frame[2] << 5)) &
                                         0x07FFU) -
                               (int16_t)kRcChValueOffset;
     g_dt7_object.rocker.ch2 =
-        (int16_t)((((uint16_t)rx_buffer[2] >> 6) | ((uint16_t)rx_buffer[3] << 2) |
-                   ((uint16_t)rx_buffer[4] << 10)) &
+        (int16_t)((((uint16_t)frame[2] >> 6) | ((uint16_t)frame[3] << 2) |
+                   ((uint16_t)frame[4] << 10)) &
                   0x07FFU) -
         (int16_t)kRcChValueOffset;
-    g_dt7_object.rocker.ch3 = (int16_t)((((uint16_t)rx_buffer[4] >> 1) |
-                                         ((uint16_t)rx_buffer[5] << 7)) &
+    g_dt7_object.rocker.ch3 = (int16_t)((((uint16_t)frame[4] >> 1) |
+                                         ((uint16_t)frame[5] << 7)) &
                                         0x07FFU) -
                               (int16_t)kRcChValueOffset;
 
-    g_dt7_object.rocker.sw1 = (uint8_t)(((rx_buffer[5] >> 4) & 0x0CU) >> 2);
-    g_dt7_object.rocker.sw2 = (uint8_t)((rx_buffer[5] >> 4) & 0x03U);
+    g_dt7_object.rocker.sw1 = (uint8_t)(((frame[5] >> 4) & 0x0CU) >> 2);
+    g_dt7_object.rocker.sw2 = (uint8_t)((frame[5] >> 4) & 0x03U);
 
     g_dt7_object.mouse.x =
-        (int16_t)((uint16_t)rx_buffer[6] | ((uint16_t)rx_buffer[7] << 8));
+        (int16_t)((uint16_t)frame[6] | ((uint16_t)frame[7] << 8));
     g_dt7_object.mouse.y =
-        (int16_t)((uint16_t)rx_buffer[8] | ((uint16_t)rx_buffer[9] << 8));
+        (int16_t)((uint16_t)frame[8] | ((uint16_t)frame[9] << 8));
     g_dt7_object.mouse.z =
-        (int16_t)((uint16_t)rx_buffer[10] | ((uint16_t)rx_buffer[11] << 8));
-    g_dt7_object.mouse.l = rx_buffer[12];
-    g_dt7_object.mouse.r = rx_buffer[13];
+        (int16_t)((uint16_t)frame[10] | ((uint16_t)frame[11] << 8));
+    g_dt7_object.mouse.l = frame[12];
+    g_dt7_object.mouse.r = frame[13];
 
-    uint16_t key = (uint16_t)rx_buffer[14] | ((uint16_t)rx_buffer[15] << 8);
+    uint16_t key = (uint16_t)frame[14] | ((uint16_t)frame[15] << 8);
     g_dt7_object.key.w = (uint8_t)((key & kKeyPressedOffsetW) != 0U);
     g_dt7_object.key.s = (uint8_t)((key & kKeyPressedOffsetS) != 0U);
     g_dt7_object.key.a = (uint8_t)((key & kKeyPressedOffsetA) != 0U);
@@ -73,11 +89,13 @@ void Dt7RxCallback(uint8_t *rx_buffer, uint16_t length)
     g_dt7_object.key.b = (uint8_t)((key & kKeyPressedOffsetB) != 0U);
 
     g_dt7_object.rocker.wheel =
-        (int16_t)(((uint16_t)rx_buffer[16] | ((uint16_t)rx_buffer[17] << 8)) &
+        (int16_t)(((uint16_t)frame[16] | ((uint16_t)frame[17] << 8)) &
                   0x07FFU) -
         (int16_t)kRcChValueOffset;
     g_dt7_object.last_update_tick = osKernelGetTickCount();
     g_dt7_object.frame_count++;
+    StreamBufferConsume(&g_dt7_rx_stream_buffer, kDt7FrameLength);
+    }
 }
 
 uint32_t Dt7FrameCount(void) { return g_dt7_object.frame_count; }

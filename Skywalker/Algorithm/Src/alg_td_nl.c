@@ -1,6 +1,7 @@
 #include "alg_td_nl.h"
 
 #include "math.h"
+#include "stddef.h"
 /**
  * @brief 初始化非线性微分追踪器
  * @param td_nl 非线性微分追踪器结构体指针
@@ -39,6 +40,10 @@ static float SignF(float x)
 static float Fhan(float x_1, float x_2, float r, float h)
 {
   float d = r * h;
+  if (d == 0.0f)
+  {
+    return 0.0f;
+  }
   float a_0 = r * h * h;
   float y = x_1 + a_0;
   float a_1 = sqrtf(d * (d + 8.0f * fabsf(y)));
@@ -57,6 +62,10 @@ static float Fhan(float x_1, float x_2, float r, float h)
  */
 void TdNlUpdate(TdNlObject *td_nl, float input, float dt)
 {
+  if (td_nl == NULL || dt <= 0.0f || td_nl->r <= 0.0f || td_nl->h <= 0.0f)
+  {
+    return;
+  }
   float fh = Fhan(td_nl->x1 - input, td_nl->x2, td_nl->r, td_nl->h);
   float x1_dot = td_nl->x2;
   float x2_dot = -fh;

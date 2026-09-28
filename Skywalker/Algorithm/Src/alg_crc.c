@@ -1,5 +1,6 @@
 #include "alg_crc.h"
 
+#include "stddef.h"
 #include "stdbool.h"
 #include "stdint.h"
 // CRC8校验表
@@ -105,6 +106,10 @@ uint16_t GetCrc16(uint8_t *data, uint16_t len)
  */
 bool CheckCrc8(uint8_t *data, uint16_t len)
 {
+  if (data == NULL || len < 2U)
+  {
+    return false;
+  }
   return GetCrc8(data, len - 1) == data[len - 1];
 }
 /**
@@ -115,5 +120,9 @@ bool CheckCrc8(uint8_t *data, uint16_t len)
  */
 bool CheckCrc16(uint8_t *data, uint16_t len)
 {
+  if (data == NULL || len < 2U)
+  {
+    return false;
+  }
   return GetCrc16(data, len - 2) == ((data[len - 1] << 8) | data[len - 2]);
 }

@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "bsp_uart.h"
+#include "bsp_stream.h"
 
 enum
 {
@@ -198,7 +199,7 @@ typedef struct
   UART_HandleTypeDef *tx_huart;            // 发送串口
   RefereeQueue queue;                      // 完整帧队列
   uint8_t rx_stream[kRefereeRxStreamSize]; // 流式接收缓存
-  uint16_t rx_stream_length;               // 流式接收缓存有效长度
+  StreamBuffer rx_stream_buffer;           // 流式接收缓存状态
   uint8_t tx_sequence;                     // 发送包序号
   uint32_t received_frame_count;           // 已接收有效帧计数
   uint32_t dropped_frame_count;            // 丢弃帧计数

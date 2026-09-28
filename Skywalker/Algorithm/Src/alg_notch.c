@@ -1,6 +1,7 @@
 #include "alg_notch.h"
 
 #include "math.h"
+#include "stddef.h"
 /**
  * @brief 初始化陷波滤波器
  * @param notch_filter 陷波滤波器指针
@@ -11,6 +12,23 @@
 void NotchFilterInit(NotchFilterObject *notch_filter, float f0, float q,
                      float fs)
 {
+  if (notch_filter == NULL)
+  {
+    return;
+  }
+  if (fs <= 0.0f || q <= 0.0f || f0 <= 0.0f || f0 >= fs * 0.5f)
+  {
+    notch_filter->a0 = 1.0f;
+    notch_filter->a1 = 0.0f;
+    notch_filter->a2 = 0.0f;
+    notch_filter->b1 = 0.0f;
+    notch_filter->b2 = 0.0f;
+    notch_filter->x1 = 0.0f;
+    notch_filter->x2 = 0.0f;
+    notch_filter->y1 = 0.0f;
+    notch_filter->y2 = 0.0f;
+    return;
+  }
   float w0 = 2.0f * M_PI * f0 / fs;
   float alpha = sinf(w0) / (2.0f * q);
   float cos_w0 = cosf(w0);
@@ -33,6 +51,10 @@ void NotchFilterInit(NotchFilterObject *notch_filter, float f0, float q,
  */
 float NotchFilterProcess(NotchFilterObject *notch_filter, float input)
 {
+  if (notch_filter == NULL)
+  {
+    return input;
+  }
   // 计算当前输出
   float output =
       notch_filter->a0 * input + notch_filter->a1 * notch_filter->x1 +

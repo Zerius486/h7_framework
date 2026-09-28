@@ -56,29 +56,32 @@ void KfDeinit(KfObject *kf)
   {
     return;
   }
-  free(kf->xhat_data);
-  free(kf->xhat_minus_data);
-  free(kf->u_data);
-  free(kf->z_data);
-  free(kf->k_data);
-  free(kf->p_data);
-  free(kf->p_minus_data);
-  free(kf->f_data);
-  free(kf->f_t_data);
-  free(kf->b_data);
-  free(kf->h_data);
-  free(kf->h_t_data);
-  free(kf->r_data);
-  free(kf->q_data);
-  free(kf->s_data);
-  free(kf->i_data);
-  free(kf->temp_xx_1_data);
-  free(kf->temp_xx_2_data);
-  free(kf->temp_xz_data);
-  free(kf->temp_zx_data);
-  free(kf->temp_zz_data);
-  free(kf->temp_x1_data);
-  free(kf->temp_z1_data);
+  if (kf->is_data_allocated != 0U)
+  {
+    free(kf->xhat_data);
+    free(kf->xhat_minus_data);
+    free(kf->u_data);
+    free(kf->z_data);
+    free(kf->k_data);
+    free(kf->p_data);
+    free(kf->p_minus_data);
+    free(kf->f_data);
+    free(kf->f_t_data);
+    free(kf->b_data);
+    free(kf->h_data);
+    free(kf->h_t_data);
+    free(kf->r_data);
+    free(kf->q_data);
+    free(kf->s_data);
+    free(kf->i_data);
+    free(kf->temp_xx_1_data);
+    free(kf->temp_xx_2_data);
+    free(kf->temp_xz_data);
+    free(kf->temp_zx_data);
+    free(kf->temp_zz_data);
+    free(kf->temp_x1_data);
+    free(kf->temp_z1_data);
+  }
   memset(kf, 0, sizeof(*kf));
 }
 /**
@@ -100,6 +103,7 @@ int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size)
   kf->xhat_size = xhat_size;
   kf->u_size = u_size;
   kf->z_size = z_size;
+  kf->is_data_allocated = 1U;
   kf->xhat_data = kf_alloc_f32(xhat_size);
   kf->xhat_minus_data = kf_alloc_f32(xhat_size);
   kf->u_data = kf_alloc_f32(u_size > 0U ? u_size : 1U);
@@ -233,20 +237,17 @@ arm_status KfPredict(KfObject *kf)
 /**
  * @brief 卡尔曼滤波器更新步骤
  * @param kf 卡尔曼滤波器对象指针
- * @param z_measurement 观测值指针，如果为NULL则不更新观测值
+ * @param z_measurement 观测值指针
  * @return 执行状态，ARM_MATH_SUCCESS表示成功，其他值表示失败
  */
 arm_status KfUpdate(KfObject *kf, const float *z_measurement)
 {
   arm_status status;
-  if ((kf == NULL) || (kf->is_inited == 0U))
+  if ((kf == NULL) || (kf->is_inited == 0U) || (z_measurement == NULL))
   {
     return ARM_MATH_ARGUMENT_ERROR;
   }
-  if (z_measurement != NULL)
-  {
-    KfCopyVector(kf->z_data, z_measurement, kf->z_size);
-  }
+  KfCopyVector(kf->z_data, z_measurement, kf->z_size);
   status = arm_mat_trans_f32(&kf->h, &kf->h_t);
   if (status != ARM_MATH_SUCCESS)
   {
@@ -319,7 +320,7 @@ arm_status KfUpdate(KfObject *kf, const float *z_measurement)
  * @brief 卡尔曼滤波器单步执行函数
  * @param kf 卡尔曼滤波器对象指针
  * @param u 控制输入指针，如果为NULL则不更新控制输入
- * @param z_measurement 观测值指针，如果为NULL则不更新观测值
+ * @param z_measurement 观测值指针
  * @return 执行状态，ARM_MATH_SUCCESS表示成功，其他值表示失败
  */
 arm_status KfStep(KfObject *kf, const float *u, const float *z_measurement)
