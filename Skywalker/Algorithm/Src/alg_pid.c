@@ -1,6 +1,7 @@
 #include "alg_pid.h"
 
 #include "math.h"
+#include "stddef.h"
 #include "stdbool.h"
 /**
  * @brief 重置PID控制器状态
@@ -8,6 +9,10 @@
  */
 void PidReset(PidObject *pid_object)
 {
+  if (pid_object == NULL)
+  {
+    return;
+  }
   pid_object->reference = 0.0f;
   pid_object->feedback = 0.0f;
   pid_object->error = 0.0f;
@@ -24,6 +29,10 @@ void PidReset(PidObject *pid_object)
  */
 void PidInit(PidObject *pid_object, PidConfig *pid_config)
 {
+  if (pid_object == NULL || pid_config == NULL)
+  {
+    return;
+  }
   pid_object->is_enabled = true;
   pid_object->kp = pid_config->kp;
   pid_object->ki = pid_config->ki;
@@ -53,8 +62,13 @@ void PidInit(PidObject *pid_object, PidConfig *pid_config)
  */
 float PidCalculate(PidObject *pid_object, float reference, float feedback)
 {
-  if (pid_object->sampling_time <= 0.0f)
+  if (pid_object == NULL)
   {
+    return 0.0f;
+  }
+  if (!pid_object->is_enabled || pid_object->sampling_time <= 0.0f)
+  {
+    pid_object->output = 0.0f;
     return 0.0f;
   }
   // 更新控制器状态
@@ -68,7 +82,7 @@ float PidCalculate(PidObject *pid_object, float reference, float feedback)
   // 微分先行
   if (pid_object->is_derivativeonfeedback_enabled)
   {
-    d_out = pid_object->kd *
+    d_out = -pid_object->kd *
             (pid_object->feedback - pid_object->previous_feedback) /
             pid_object->sampling_time;
   }
@@ -144,16 +158,13 @@ float PidCalculate(PidObject *pid_object, float reference, float feedback)
       pid_object->output = 0.0f;
     }
   }
-  if (pid_object->is_antiwindup_enabled)
+  if (pid_object->output > pid_object->output_max)
   {
-    if (pid_object->output > pid_object->output_max)
-    {
-      pid_object->output = pid_object->output_max;
-    }
-    else if (pid_object->output < -pid_object->output_max)
-    {
-      pid_object->output = -pid_object->output_max;
-    }
+    pid_object->output = pid_object->output_max;
+  }
+  else if (pid_object->output < -pid_object->output_max)
+  {
+    pid_object->output = -pid_object->output_max;
   }
   pid_object->previous_error = pid_object->error;
   return pid_object->output;
