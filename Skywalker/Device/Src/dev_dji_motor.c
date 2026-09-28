@@ -47,6 +47,22 @@ static float DjiMotorWrapPi(float angle)
 }
 
 /**
+ * @brief 计算GM6020位置环目标角度分支
+ * @param motor DJI电机对象指针
+ * @return 位置目标角度（rad）
+ */
+static float DjiMotorPositionReference(const DjiMotor *motor)
+{
+  float candidate_angle =
+      motor->state.continuous_angle +
+      motor->state.omega * motor->state.position_loop.sampling_time;
+  float turn_count =
+      roundf((candidate_angle - motor->state.given_angle) /
+             (2.0f * (float)M_PI));
+  return motor->state.given_angle + turn_count * 2.0f * (float)M_PI;
+}
+
+/**
  * @brief 将DJI电机电流值从单位值转换为安培
  * @param type DJI电机类型
  * @param current_units 电流值（单位值）
@@ -146,6 +162,18 @@ void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data)
 
   motor->state.angle = EncoderToRadian(encoder);
   motor->state.omega = RpmToRadS((float)rpm);
+  if (!motor->state.is_angle_initialized)
+  {
+    motor->state.continuous_angle = motor->state.angle;
+    motor->state.last_angle = motor->state.angle;
+    motor->state.is_angle_initialized = true;
+  }
+  else
+  {
+    motor->state.continuous_angle +=
+        DjiMotorWrapPi(motor->state.angle - motor->state.last_angle);
+    motor->state.last_angle = motor->state.angle;
+  }
   motor->state.current =
       DjiMotorCurrentUnitsToAmperes(motor->type, current_units);
 
@@ -179,13 +207,13 @@ void DjiMotorCurrentCalculate(DjiMotor *motor)
     float position_reference = motor->state.given_angle;
     if (motor->type == kDjiMotorGm6020)
     {
-      position_reference =
-          motor->state.angle +
-          DjiMotorWrapPi(motor->state.given_angle - motor->state.angle);
+      position_reference = DjiMotorPositionReference(motor);
     }
 
     motor->state.given_omega = PidCalculate(
-        &motor->state.position_loop, position_reference, motor->state.angle);
+        &motor->state.position_loop, position_reference,
+        motor->type == kDjiMotorGm6020 ? motor->state.continuous_angle
+                                       : motor->state.angle);
     motor->state.given_current = PidCalculate(
         &motor->state.speed_loop, motor->state.given_omega, motor->state.omega);
     break;

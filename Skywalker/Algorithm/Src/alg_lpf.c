@@ -1,4 +1,6 @@
 #include "alg_lpf.h"
+
+#include "stddef.h"
 /**
  * @brief 一阶低通滤波器初始化
  * @param lpf_1st 一阶低通滤波器结构体指针
@@ -6,8 +8,14 @@
  */
 void Lpf1stInit(Lpf1stObject *lpf_1st, float alpha)
 {
+  if (lpf_1st == NULL)
+  {
+    return;
+  }
   if (alpha <= 0.0f || alpha >= 1.0f)
   {
+    lpf_1st->alpha = 1.0f;
+    lpf_1st->prev_input = 0.0f;
     return;
   }
   lpf_1st->alpha = alpha;
@@ -21,6 +29,10 @@ void Lpf1stInit(Lpf1stObject *lpf_1st, float alpha)
  */
 float Lpf1stUpdate(Lpf1stObject *lpf_1st, float input)
 {
+  if (lpf_1st == NULL)
+  {
+    return input;
+  }
   float output =
       lpf_1st->alpha * input + (1.0f - lpf_1st->alpha) * lpf_1st->prev_input;
   lpf_1st->prev_input = output;
@@ -34,8 +46,16 @@ float Lpf1stUpdate(Lpf1stObject *lpf_1st, float input)
  */
 void Lpf2ndInit(Lpf2ndObject *lpf_2nd, float alpha_1, float alpha_2)
 {
+  if (lpf_2nd == NULL)
+  {
+    return;
+  }
   if (alpha_1 + alpha_2 >= 1.0f || alpha_1 <= 0.0f || alpha_2 <= 0.0f)
   {
+    lpf_2nd->alpha_1 = 1.0f;
+    lpf_2nd->alpha_2 = 0.0f;
+    lpf_2nd->prev_input_1 = 0.0f;
+    lpf_2nd->prev_input_2 = 0.0f;
     return;
   }
   lpf_2nd->alpha_1 = alpha_1;
@@ -51,6 +71,10 @@ void Lpf2ndInit(Lpf2ndObject *lpf_2nd, float alpha_1, float alpha_2)
  */
 float Lpf2ndUpdate(Lpf2ndObject *lpf_2nd, float input)
 {
+  if (lpf_2nd == NULL)
+  {
+    return input;
+  }
   float output =
       lpf_2nd->alpha_1 * input + lpf_2nd->alpha_2 * lpf_2nd->prev_input_1 +
       (1.0f - lpf_2nd->alpha_1 - lpf_2nd->alpha_2) * lpf_2nd->prev_input_2;

@@ -108,6 +108,8 @@ void RefereeInit(RefereeObject *referee, UART_HandleTypeDef *rx_huart,
   memset(referee, 0, sizeof(*referee));
   referee->rx_huart = rx_huart;
   referee->tx_huart = tx_huart;
+  StreamBufferInit(&referee->rx_stream_buffer, referee->rx_stream,
+                   sizeof(referee->rx_stream));
 
   if (referee == &g_referee && rx_huart != NULL)
   {
@@ -129,39 +131,11 @@ void RefereeRxCallback(RefereeObject *referee, uint8_t *rx_buffer,
     return;
   }
 
-  if ((uint32_t)referee->rx_stream_length + rx_length > kRefereeRxStreamSize)
-  {
-    // 缓存空间不足时保留尾部数据，避免半包在两次回调之间丢失。
-    if (rx_length >= kRefereeRxStreamSize)
-    {
-      memcpy(referee->rx_stream, &rx_buffer[rx_length - kRefereeRxStreamSize],
-             kRefereeRxStreamSize);
-      referee->rx_stream_length = kRefereeRxStreamSize;
-    }
-    else
-    {
-      uint16_t keep_capacity = (uint16_t)(kRefereeRxStreamSize - rx_length);
-      uint16_t keep_length = referee->rx_stream_length < keep_capacity
-                                 ? referee->rx_stream_length
-                                 : keep_capacity;
-      memmove(referee->rx_stream,
-              &referee->rx_stream[referee->rx_stream_length - keep_length],
-              keep_length);
-      memcpy(&referee->rx_stream[keep_length], rx_buffer, rx_length);
-      referee->rx_stream_length = (uint16_t)(keep_length + rx_length);
-    }
-  }
-  else
-  {
-    memcpy(&referee->rx_stream[referee->rx_stream_length], rx_buffer,
-           rx_length);
-    referee->rx_stream_length =
-        (uint16_t)(referee->rx_stream_length + rx_length);
-  }
+  StreamBufferAppend(&referee->rx_stream_buffer, rx_buffer, rx_length);
 
   // 从流式缓存中按SOF和data_length拆出完整帧。
   uint16_t offset = 0;
-  while ((uint16_t)(referee->rx_stream_length - offset) >=
+  while ((uint16_t)(referee->rx_stream_buffer.length - offset) >=
          kRefereeFrameMinLength)
   {
     if (referee->rx_stream[offset] != kRefereeSof)
@@ -170,7 +144,7 @@ void RefereeRxCallback(RefereeObject *referee, uint8_t *rx_buffer,
       continue;
     }
 
-    uint8_t *frame = &referee->rx_stream[offset];
+    uint8_t *frame = &referee->rx_stream_buffer.buffer[offset];
     uint16_t data_length = RefereeFrameDataLength(frame);
     uint16_t frame_length = (uint16_t)(data_length + kRefereeFrameMinLength);
 
@@ -180,7 +154,7 @@ void RefereeRxCallback(RefereeObject *referee, uint8_t *rx_buffer,
       offset++;
       continue;
     }
-    if ((uint16_t)(referee->rx_stream_length - offset) < frame_length)
+    if ((uint16_t)(referee->rx_stream_buffer.length - offset) < frame_length)
     {
       break;
     }
@@ -197,20 +171,7 @@ void RefereeRxCallback(RefereeObject *referee, uint8_t *rx_buffer,
     offset = (uint16_t)(offset + frame_length);
   }
 
-  if (offset > 0U)
-  {
-    if (offset < referee->rx_stream_length)
-    {
-      memmove(referee->rx_stream, &referee->rx_stream[offset],
-              referee->rx_stream_length - offset);
-      referee->rx_stream_length =
-          (uint16_t)(referee->rx_stream_length - offset);
-    }
-    else
-    {
-      referee->rx_stream_length = 0;
-    }
-  }
+  StreamBufferConsume(&referee->rx_stream_buffer, offset);
 }
 
 /**
@@ -236,10 +197,20 @@ void RefereeUpdate(RefereeObject *referee)
 
   while (referee->queue.head != referee->queue.tail)
   {
-    RefereePacket *packet = &referee->queue.packets[referee->queue.head];
-    uint16_t data_length = RefereeFrameDataLength(packet->buffer);
-    uint16_t cmd_id = RefereeFrameCommandId(packet->buffer);
-    const uint8_t *data = &packet->buffer[kRefereeDataOffset];
+    RefereePacket packet;
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    packet = referee->queue.packets[referee->queue.head];
+    referee->queue.head =
+        (uint16_t)((referee->queue.head + 1U) % kRefereeQueueSize);
+    if (primask == 0U)
+    {
+      __enable_irq();
+    }
+
+    uint16_t data_length = RefereeFrameDataLength(packet.buffer);
+    uint16_t cmd_id = RefereeFrameCommandId(packet.buffer);
+    const uint8_t *data = &packet.buffer[kRefereeDataOffset];
 
     switch ((RefereeCommandId)cmd_id)
     {
@@ -317,8 +288,6 @@ void RefereeUpdate(RefereeObject *referee)
       break;
     }
 
-    referee->queue.head =
-        (uint16_t)((referee->queue.head + 1U) % kRefereeQueueSize);
   }
 }
 

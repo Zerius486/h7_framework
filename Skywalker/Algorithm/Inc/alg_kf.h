@@ -56,6 +56,7 @@ typedef struct
   float *temp_x1_data;
   float *temp_z1_data;
   uint8_t is_inited;
+  uint8_t is_data_allocated;
 } KfObject;
 int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size);
 void KfDeinit(KfObject *kf);
