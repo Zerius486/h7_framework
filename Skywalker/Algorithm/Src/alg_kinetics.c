@@ -1,6 +1,8 @@
 #include "alg_kinetics.h"
 
 #include <math.h>
+
+static const float kSteerWheelSpeedEpsilon = 1e-4f;
 /**
  * @brief 初始化底盘结构体
  * @param chassis 底盘结构体指针
@@ -65,7 +67,10 @@ void ChassisUpdateState(Chassis *chassis)
     for (int i = 0; i < 4; i++)
     {
       chassis->state.wheel_speed[i] = sqrtf(vx[i] * vx[i] + vy[i] * vy[i]);
-      chassis->state.wheel_angle[i] = atan2f(vy[i], vx[i]);
+      if (chassis->state.wheel_speed[i] > kSteerWheelSpeedEpsilon)
+      {
+        chassis->state.wheel_angle[i] = atan2f(vy[i], vx[i]);
+      }
     }
     break;
   }

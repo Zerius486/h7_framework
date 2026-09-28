@@ -535,18 +535,19 @@ static void Bmi088ReadRawAccel(Bmi088Object *bmi088)
  * @brief 读取陀螺仪原始数据
  * @param bmi088 BMI088对象指针
  */
-static void Bmi088ReadRawGyro(Bmi088Object *bmi088)
+static bool Bmi088ReadRawGyro(Bmi088Object *bmi088)
 {
   uint8_t data[8] = {0};
   Bmi088GyroReadMulti(bmi088->hspi, kBmi088GyroChipIdReg, data, sizeof(data));
   if (data[0] != kBmi088GyroChipIdValue)
   {
-    return;
+    return false;
   }
 
   bmi088->raw.gyro[0] = Bmi088BytesToInt16(data[2], data[3]);
   bmi088->raw.gyro[1] = Bmi088BytesToInt16(data[4], data[5]);
   bmi088->raw.gyro[2] = Bmi088BytesToInt16(data[6], data[7]);
+  return true;
 }
 
 /**
@@ -723,7 +724,11 @@ Bmi088Status Bmi088Update(Bmi088Object *bmi088)
 
   Bmi088ReadRawAccel(bmi088);
   Bmi088ReadRawTemperature(bmi088);
-  Bmi088ReadRawGyro(bmi088);
+  if (!Bmi088ReadRawGyro(bmi088))
+  {
+    bmi088->status = kBmi088NoSensor;
+    return bmi088->status;
+  }
   Bmi088UpdateScaledData(bmi088);
   Bmi088UpdateCorrectedData(bmi088);
 
@@ -1073,7 +1078,10 @@ Bmi088Status Bmi088CalibrateGyroOffset(Bmi088Object *bmi088,
   memset(bmi088->gyro_offset, 0, sizeof(bmi088->gyro_offset));
   for (uint16_t sample = 0; sample < sample_count; sample++)
   {
-    Bmi088ReadRawGyro(bmi088);
+    if (!Bmi088ReadRawGyro(bmi088))
+    {
+      return kBmi088NoSensor;
+    }
     for (uint8_t i = 0; i < 3U; i++)
     {
       gyro_sum[i] += bmi088->gyro_sensitivity * bmi088->raw.gyro[i];

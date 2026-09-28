@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "alg_crc.h"
+#include "bsp_stream.h"
 #include "bsp_uart.h"
 #include "usart.h"
 
@@ -14,6 +15,10 @@ GimbalToVision g_gimbal_to_vision = {
 VisionToGimbal g_vision_to_gimbal = {
     .head = {'A', 'B'},
 };
+
+static uint8_t g_vision_rx_stream[sizeof(VisionToGimbal) * 4U];
+static StreamBuffer g_vision_rx_stream_buffer;
+static bool g_vision_rx_stream_initialized = false;
 
 static bool VisionProtocolHeaderIsValid(const uint8_t *data)
 {
@@ -27,25 +32,34 @@ void VisionProtocolRxCallback(uint8_t *rx_buffer, uint16_t rx_length)
     return;
   }
 
-  uint16_t offset = 0;
-  while (offset < rx_length)
+  if (!g_vision_rx_stream_initialized)
   {
-    uint16_t remaining_length = (uint16_t)(rx_length - offset);
-    if (remaining_length >= sizeof(VisionToGimbal) &&
-        VisionProtocolHeaderIsValid(&rx_buffer[offset]))
-    {
-      if (CheckCrc16(&rx_buffer[offset], sizeof(VisionToGimbal)))
-      {
-        memcpy(&g_vision_to_gimbal, &rx_buffer[offset],
-               sizeof(g_vision_to_gimbal));
-      }
-      offset = (uint16_t)(offset + sizeof(VisionToGimbal));
-    }
-    else
+    StreamBufferInit(&g_vision_rx_stream_buffer, g_vision_rx_stream,
+                     sizeof(g_vision_rx_stream));
+    g_vision_rx_stream_initialized = true;
+  }
+  StreamBufferAppend(&g_vision_rx_stream_buffer, rx_buffer, rx_length);
+
+  uint16_t offset = 0U;
+  while ((uint16_t)(g_vision_rx_stream_buffer.length - offset) >=
+         sizeof(VisionToGimbal))
+  {
+    if (!VisionProtocolHeaderIsValid(&g_vision_rx_stream_buffer.buffer[offset]))
     {
       offset++;
+      continue;
     }
+
+    if (CheckCrc16(&g_vision_rx_stream_buffer.buffer[offset],
+                   sizeof(VisionToGimbal)))
+    {
+      memcpy(&g_vision_to_gimbal, &g_vision_rx_stream_buffer.buffer[offset],
+             sizeof(g_vision_to_gimbal));
+    }
+    offset = (uint16_t)(offset + sizeof(VisionToGimbal));
   }
+
+  StreamBufferConsume(&g_vision_rx_stream_buffer, offset);
 }
 
 void VisionProtocolTransmitGimbalState(void)

@@ -25,6 +25,9 @@ typedef struct
   bool is_enabled;         // 电机使能标志
   uint32_t id;             // 电机ID
   float angle;             // 当前角度（rad）
+  float continuous_angle;  // 当前连续角度（rad）
+  float last_angle;        // 上一次单圈角度（rad）
+  bool is_angle_initialized; // 连续角度初始化标志
   float given_angle;       // 目标角度（rad）
   float omega;             // 当前角速度（rad/s）
   float given_omega;       // 目标角速度（rad/s）
