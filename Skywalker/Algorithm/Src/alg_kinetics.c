@@ -4,6 +4,23 @@
 
 static const float kSteerWheelSpeedEpsilon = 1e-4f;
 /**
+ * @brief 将角度归一化到[-pi, pi]
+ * @param angle 输入角度
+ * @return 归一化后的角度
+ */
+static float ChassisWrapPi(float angle)
+{
+  while (angle > (float)M_PI)
+  {
+    angle -= 2.0f * (float)M_PI;
+  }
+  while (angle < -(float)M_PI)
+  {
+    angle += 2.0f * (float)M_PI;
+  }
+  return angle;
+}
+/**
  * @brief 初始化底盘结构体
  * @param chassis 底盘结构体指针
  * @param type 底盘类型
@@ -69,7 +86,15 @@ void ChassisUpdateState(Chassis *chassis)
       chassis->state.wheel_speed[i] = sqrtf(vx[i] * vx[i] + vy[i] * vy[i]);
       if (chassis->state.wheel_speed[i] > kSteerWheelSpeedEpsilon)
       {
-        chassis->state.wheel_angle[i] = atan2f(vy[i], vx[i]);
+        float wheel_angle = atan2f(vy[i], vx[i]);
+        float angle_error =
+            ChassisWrapPi(wheel_angle - chassis->state.wheel_angle[i]);
+        if (fabsf(angle_error) > (float)M_PI / 2.0f)
+        {
+          chassis->state.wheel_speed[i] = -chassis->state.wheel_speed[i];
+          wheel_angle = ChassisWrapPi(wheel_angle + (float)M_PI);
+        }
+        chassis->state.wheel_angle[i] = wheel_angle;
       }
     }
     break;
