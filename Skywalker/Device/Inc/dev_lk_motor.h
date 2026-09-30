@@ -23,6 +23,7 @@ typedef struct
   uint8_t id;                  // 电机ID，范围1~4
   uint16_t encoder;            // 当前编码器值
   uint16_t last_encoder;       // 上一次编码器值
+  bool is_encoder_initialized; // 编码器初始化标志
   int32_t total_round;         // 累计圈数
   float angle;                 // 单圈角度（rad）
   float total_angle;           // 累计角度（rad）

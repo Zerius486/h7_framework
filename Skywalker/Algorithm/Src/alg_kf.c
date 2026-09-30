@@ -3,18 +3,18 @@
 #include "arm_math.h"
 #include "string.h"
 /**
- * @brief 分配float型内存
- * @param count 要分配的元素个数
- * @return 分配的内存指针，如果分配失败则返回NULL
+ * @brief 获取卡尔曼滤波器工作区大小
+ * @param xhat_size 状态向量大小
+ * @param u_size 控制向量大小
+ * @param z_size 观测向量大小
+ * @return 工作区所需float元素个数
  */
-static float *kf_alloc_f32(uint32_t count)
+uint32_t KfWorkspaceSize(uint8_t xhat_size, uint8_t u_size, uint8_t z_size)
 {
-  float *ptr = (float *)malloc(count * sizeof(float));
-  if (ptr != NULL)
-  {
-    memset(ptr, 0, count * sizeof(float));
-  }
-  return ptr;
+  uint32_t x = xhat_size;
+  uint32_t u = u_size > 0U ? u_size : 1U;
+  uint32_t z = z_size;
+  return (2U * x + u + z + 8U * x * x + 5U * x * z + 3U * z * z + x + z);
 }
 /**
  * @brief 设置单位矩阵
@@ -56,32 +56,6 @@ void KfDeinit(KfObject *kf)
   {
     return;
   }
-  if (kf->is_data_allocated != 0U)
-  {
-    free(kf->xhat_data);
-    free(kf->xhat_minus_data);
-    free(kf->u_data);
-    free(kf->z_data);
-    free(kf->k_data);
-    free(kf->p_data);
-    free(kf->p_minus_data);
-    free(kf->f_data);
-    free(kf->f_t_data);
-    free(kf->b_data);
-    free(kf->h_data);
-    free(kf->h_t_data);
-    free(kf->r_data);
-    free(kf->q_data);
-    free(kf->s_data);
-    free(kf->i_data);
-    free(kf->temp_xx_1_data);
-    free(kf->temp_xx_2_data);
-    free(kf->temp_xz_data);
-    free(kf->temp_zx_data);
-    free(kf->temp_zz_data);
-    free(kf->temp_x1_data);
-    free(kf->temp_z1_data);
-  }
   memset(kf, 0, sizeof(*kf));
 }
 /**
@@ -90,12 +64,21 @@ void KfDeinit(KfObject *kf)
  * @param xhat_size 状态向量大小
  * @param u_size 控制向量大小
  * @param z_size 观测向量大小
+ * @param workspace 工作区指针
+ * @param workspace_size 工作区大小
  * @return 0表示成功，-1表示失败
  */
-int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size)
+int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size,
+              float *workspace, uint32_t workspace_size)
 {
   uint8_t i;
+  uint32_t offset = 0U;
   if ((kf == NULL) || (xhat_size == 0U) || (z_size == 0U))
+  {
+    return -1;
+  }
+  if (workspace == NULL || workspace_size <
+                              KfWorkspaceSize(xhat_size, u_size, z_size))
   {
     return -1;
   }
@@ -103,44 +86,37 @@ int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size)
   kf->xhat_size = xhat_size;
   kf->u_size = u_size;
   kf->z_size = z_size;
-  kf->is_data_allocated = 1U;
-  kf->xhat_data = kf_alloc_f32(xhat_size);
-  kf->xhat_minus_data = kf_alloc_f32(xhat_size);
-  kf->u_data = kf_alloc_f32(u_size > 0U ? u_size : 1U);
-  kf->z_data = kf_alloc_f32(z_size);
-  kf->k_data = kf_alloc_f32((uint32_t)xhat_size * z_size);
-  kf->p_data = kf_alloc_f32((uint32_t)xhat_size * xhat_size);
-  kf->p_minus_data = kf_alloc_f32((uint32_t)xhat_size * xhat_size);
-  kf->f_data = kf_alloc_f32((uint32_t)xhat_size * xhat_size);
-  kf->f_t_data = kf_alloc_f32((uint32_t)xhat_size * xhat_size);
-  kf->b_data = kf_alloc_f32((uint32_t)xhat_size * (u_size > 0U ? u_size : 1U));
-  kf->h_data = kf_alloc_f32((uint32_t)z_size * xhat_size);
-  kf->h_t_data = kf_alloc_f32((uint32_t)xhat_size * z_size);
-  kf->r_data = kf_alloc_f32((uint32_t)z_size * z_size);
-  kf->q_data = kf_alloc_f32((uint32_t)xhat_size * xhat_size);
-  kf->s_data = kf_alloc_f32((uint32_t)z_size * z_size);
-  kf->i_data = kf_alloc_f32((uint32_t)xhat_size * xhat_size);
-  kf->temp_xx_1_data = kf_alloc_f32((uint32_t)xhat_size * xhat_size);
-  kf->temp_xx_2_data = kf_alloc_f32((uint32_t)xhat_size * xhat_size);
-  kf->temp_xz_data = kf_alloc_f32((uint32_t)xhat_size * z_size);
-  kf->temp_zx_data = kf_alloc_f32((uint32_t)z_size * xhat_size);
-  kf->temp_zz_data = kf_alloc_f32((uint32_t)z_size * z_size);
-  kf->temp_x1_data = kf_alloc_f32(xhat_size);
-  kf->temp_z1_data = kf_alloc_f32(z_size);
-  if ((kf->xhat_data == NULL) || (kf->xhat_minus_data == NULL) ||
-      (kf->u_data == NULL) || (kf->z_data == NULL) || (kf->k_data == NULL) ||
-      (kf->p_data == NULL) || (kf->p_minus_data == NULL) ||
-      (kf->f_data == NULL) || (kf->f_t_data == NULL) || (kf->b_data == NULL) ||
-      (kf->h_data == NULL) || (kf->h_t_data == NULL) || (kf->r_data == NULL) ||
-      (kf->q_data == NULL) || (kf->s_data == NULL) || (kf->i_data == NULL) ||
-      (kf->temp_xx_1_data == NULL) || (kf->temp_xx_2_data == NULL) ||
-      (kf->temp_xz_data == NULL) || (kf->temp_zx_data == NULL) ||
-      (kf->temp_zz_data == NULL) || (kf->temp_x1_data == NULL) ||
-      (kf->temp_z1_data == NULL))
-  {
-    KfDeinit(kf);
-    return -1;
-  }
+#define KF_ALLOC(pointer, count)                                             \
+  do                                                                         \
+  {                                                                          \
+    (pointer) = &workspace[offset];                                          \
+    memset((pointer), 0, (count) * sizeof(float));                           \
+    offset += (count);                                                       \
+  } while (0)
+  KF_ALLOC(kf->xhat_data, xhat_size);
+  KF_ALLOC(kf->xhat_minus_data, xhat_size);
+  KF_ALLOC(kf->u_data, u_size > 0U ? u_size : 1U);
+  KF_ALLOC(kf->z_data, z_size);
+  KF_ALLOC(kf->k_data, (uint32_t)xhat_size * z_size);
+  KF_ALLOC(kf->p_data, (uint32_t)xhat_size * xhat_size);
+  KF_ALLOC(kf->p_minus_data, (uint32_t)xhat_size * xhat_size);
+  KF_ALLOC(kf->f_data, (uint32_t)xhat_size * xhat_size);
+  KF_ALLOC(kf->f_t_data, (uint32_t)xhat_size * xhat_size);
+  KF_ALLOC(kf->b_data, (uint32_t)xhat_size * (u_size > 0U ? u_size : 1U));
+  KF_ALLOC(kf->h_data, (uint32_t)z_size * xhat_size);
+  KF_ALLOC(kf->h_t_data, (uint32_t)xhat_size * z_size);
+  KF_ALLOC(kf->r_data, (uint32_t)z_size * z_size);
+  KF_ALLOC(kf->q_data, (uint32_t)xhat_size * xhat_size);
+  KF_ALLOC(kf->s_data, (uint32_t)z_size * z_size);
+  KF_ALLOC(kf->i_data, (uint32_t)xhat_size * xhat_size);
+  KF_ALLOC(kf->temp_xx_1_data, (uint32_t)xhat_size * xhat_size);
+  KF_ALLOC(kf->temp_xx_2_data, (uint32_t)xhat_size * xhat_size);
+  KF_ALLOC(kf->temp_xz_data, (uint32_t)xhat_size * z_size);
+  KF_ALLOC(kf->temp_zx_data, (uint32_t)z_size * xhat_size);
+  KF_ALLOC(kf->temp_zz_data, (uint32_t)z_size * z_size);
+  KF_ALLOC(kf->temp_x1_data, xhat_size);
+  KF_ALLOC(kf->temp_z1_data, z_size);
+#undef KF_ALLOC
   arm_mat_init_f32(&kf->xhat, xhat_size, 1U, kf->xhat_data);
   arm_mat_init_f32(&kf->xhat_minus, xhat_size, 1U, kf->xhat_minus_data);
   arm_mat_init_f32(&kf->u, u_size > 0U ? u_size : 1U, 1U, kf->u_data);

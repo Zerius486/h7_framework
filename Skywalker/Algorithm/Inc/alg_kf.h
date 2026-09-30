@@ -2,7 +2,6 @@
 #define ALG_KF_H
 #include "arm_math.h"
 #include "stdint.h"
-#include "stdlib.h"
 // 卡尔曼滤波器结构体
 typedef struct
 {
@@ -58,7 +57,9 @@ typedef struct
   uint8_t is_inited;
   uint8_t is_data_allocated;
 } KfObject;
-int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size);
+uint32_t KfWorkspaceSize(uint8_t xhat_size, uint8_t u_size, uint8_t z_size);
+int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size,
+              float *workspace, uint32_t workspace_size);
 void KfDeinit(KfObject *kf);
 arm_status KfPredict(KfObject *kf);
 arm_status KfUpdate(KfObject *kf, const float *z_measurement);
