@@ -71,15 +71,24 @@ void LkMotorUpdate(LkMotor *motor, const uint8_t rx_data[8])
       (uint16_t)(((uint16_t)rx_data[7] << 8) | (uint16_t)rx_data[6]);
 
   // 通过编码器跨半圈阈值判断溢出方向，得到连续累计角度。
-  int32_t delta =
-      (int32_t)motor->state.encoder - (int32_t)motor->state.last_encoder;
-  if (delta > 32768)
+  if (!motor->state.is_encoder_initialized)
   {
-    motor->state.total_round--;
+    motor->state.last_encoder = motor->state.encoder;
+    motor->state.is_encoder_initialized = true;
   }
-  else if (delta < -32768)
+  else
   {
-    motor->state.total_round++;
+    int32_t delta =
+        (int32_t)motor->state.encoder - (int32_t)motor->state.last_encoder;
+    if (delta > 32768)
+    {
+      motor->state.total_round--;
+    }
+    else if (delta < -32768)
+    {
+      motor->state.total_round++;
+    }
+    motor->state.last_encoder = motor->state.encoder;
   }
 
   int16_t speed_dps =
