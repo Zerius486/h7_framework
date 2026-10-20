@@ -3,21 +3,27 @@
 #include "math.h"
 #include "stdint.h"
 /**
- * @brief 将转每分钟转换为弧度每秒
- * @param rpm 转每分钟
- * @return 弧度每秒
+ * @brief 将转速从转每分钟转换为弧度每秒
+ * @param rpm 转速（r/min）
+ * @return 角速度（rad/s）
  */
-float RpmToRadS(float rpm) { return rpm * M_PI / 30.0f; }
+float RpmToRadS(float rpm)
+{
+  return rpm * M_PI / 30.0f;
+}
 /**
- * @brief 将弧度每秒转换为转每分钟
- * @param rad_s 弧度每秒
- * @return 转每分钟
+ * @brief 将角速度从弧度每秒转换为转每分钟
+ * @param rad_s 角速度（rad/s）
+ * @return 转速（r/min）
  */
-float RadSToRpm(float rad_s) { return rad_s * 30.0f / M_PI; }
+float RadSToRpm(float rad_s)
+{
+  return rad_s * 30.0f / M_PI;
+}
 /**
  * @brief 将编码器值转换为弧度
  * @param encoder_value 编码器原始值
- * @return 弧度制角度值
+ * @return 角度（rad）
  */
 float EncoderToRadian(uint16_t encoder_value)
 {
@@ -25,7 +31,7 @@ float EncoderToRadian(uint16_t encoder_value)
 }
 /**
  * @brief 将弧度转换为编码器值
- * @param radian 弧度制角度值
+ * @param radian 角度（rad）
  * @return 编码器值
  */
 uint16_t RadianToEncoder(float radian)
@@ -34,20 +40,26 @@ uint16_t RadianToEncoder(float radian)
 }
 /**
  * @brief 将弧度转换为角度
- * @param radian 弧度制角度值
- * @return 角度制角度值
+ * @param radian 角度（rad）
+ * @return 角度（°）
  */
-float RadianToDegree(float radian) { return radian * 180.0f / M_PI; }
+float RadianToDegree(float radian)
+{
+  return radian * 180.0f / M_PI;
+}
 /**
  * @brief 将角度转换为弧度
- * @param degree 角度制角度值
- * @return 弧度制角度值
+ * @param degree 角度（°）
+ * @return 角度（rad）
  */
-float DegreeToRadian(float degree) { return degree * M_PI / 180.0f; }
+float DegreeToRadian(float degree)
+{
+  return degree * M_PI / 180.0f;
+}
 /**
  * @brief 将编码器值转换为角度
  * @param encoder_value 编码器原始值
- * @return 角度制角度值
+ * @return 角度（°）
  */
 float EncoderToDegree(uint16_t encoder_value)
 {
@@ -55,7 +67,7 @@ float EncoderToDegree(uint16_t encoder_value)
 }
 /**
  * @brief 将角度转换为编码器值
- * @param degree 角度制角度值
+ * @param degree 角度（°）
  * @return 编码器值
  */
 uint16_t DegreeToEncoder(float degree)

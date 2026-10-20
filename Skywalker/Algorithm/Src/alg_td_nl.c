@@ -58,7 +58,7 @@ static float Fhan(float x_1, float x_2, float r, float h)
  * @brief 更新非线性微分追踪器
  * @param td_nl 非线性微分追踪器结构体指针
  * @param input 当前输入值
- * @param dt 时间步长
+ * @param dt 采样时间（s）
  */
 void TdNlUpdate(TdNlObject *td_nl, float input, float dt)
 {

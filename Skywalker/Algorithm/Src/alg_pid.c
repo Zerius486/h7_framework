@@ -4,6 +4,71 @@
 #include "stddef.h"
 #include "stdbool.h"
 /**
+ * @brief 更新增益并用积分状态保持当前控制输出
+ * @param pid_object PID控制器结构体指针
+ * @param kp 比例增益
+ * @param ki 积分增益
+ * @param kd 微分增益
+ * @return 是否成功
+ */
+bool PidSetGains(PidObject *pid_object, float kp, float ki, float kd)
+{
+  if (pid_object == NULL || !isfinite(kp) || !isfinite(ki) || !isfinite(kd) ||
+      kp < 0.0f || ki < 0.0f || kd < 0.0f || pid_object->sampling_time <= 0.0f)
+  {
+    return false;
+  }
+  float slope = pid_object->is_derivativeonfeedback_enabled
+                    ? -(pid_object->feedback - pid_object->previous_feedback) /
+                          pid_object->sampling_time
+                    : (pid_object->error - pid_object->previous_error) /
+                          pid_object->sampling_time;
+  float feedforward =
+      pid_object->is_feedforward_enabled
+          ? pid_object->kff *
+                (pid_object->reference - pid_object->previous_reference) /
+                pid_object->sampling_time
+          : 0.0f;
+  float integral =
+      pid_object->output - kp * pid_object->error - kd * slope - feedforward;
+  float integral_limit = pid_object->ki * pid_object->integral_max;
+  pid_object->kp = kp;
+  pid_object->ki = ki;
+  pid_object->kd = kd;
+  pid_object->error_sum = ki > 0.0f ? integral / ki : 0.0f;
+  if (ki > 0.0f && pid_object->is_antiwindup_enabled)
+  {
+    pid_object->integral_max = integral_limit / ki;
+    pid_object->error_sum =
+        fminf(fmaxf(pid_object->error_sum, -pid_object->integral_max),
+              pid_object->integral_max);
+  }
+  return true;
+}
+
+/**
+ * @brief 跟踪外部限幅后的输出差并修正积分状态
+ * @param pid_object PID控制器结构体指针
+ * @param output_difference 最终指令减限幅前总请求
+ * @param tracking_rate 跟踪速率（1/s）
+ */
+void PidTrackOutput(PidObject *pid_object, float output_difference,
+                    float tracking_rate)
+{
+  if (pid_object == NULL || pid_object->ki <= 0.0f ||
+      !isfinite(output_difference) || !isfinite(tracking_rate) ||
+      tracking_rate <= 0.0f)
+  {
+    return;
+  }
+  float fraction = fminf(tracking_rate * pid_object->sampling_time, 1.0f);
+  pid_object->error_sum += fraction * output_difference / pid_object->ki;
+  pid_object->error_sum =
+      fminf(fmaxf(pid_object->error_sum, -pid_object->integral_max),
+            pid_object->integral_max);
+}
+
+/**
  * @brief 重置PID控制器状态
  * @param pid_object PID控制器结构体指针
  */

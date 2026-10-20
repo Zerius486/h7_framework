@@ -278,8 +278,7 @@ static void Bmi088ReadAccelRegisters(SPI_HandleTypeDef *hspi, uint8_t reg,
 /**
  * @brief 带片选控制写加速度计寄存器
  */
-static void Bmi088AccelWrite(SPI_HandleTypeDef *hspi, uint8_t reg,
-                             uint8_t data)
+static void Bmi088AccelWrite(SPI_HandleTypeDef *hspi, uint8_t reg, uint8_t data)
 {
   Bmi088AccelSelect();
   Bmi088WriteRegister(hspi, reg, data);
@@ -311,8 +310,7 @@ static void Bmi088AccelReadMulti(SPI_HandleTypeDef *hspi, uint8_t reg,
 /**
  * @brief 带片选控制写陀螺仪寄存器
  */
-static void Bmi088GyroWrite(SPI_HandleTypeDef *hspi, uint8_t reg,
-                            uint8_t data)
+static void Bmi088GyroWrite(SPI_HandleTypeDef *hspi, uint8_t reg, uint8_t data)
 {
   Bmi088GyroSelect();
   Bmi088WriteRegister(hspi, reg, data);
