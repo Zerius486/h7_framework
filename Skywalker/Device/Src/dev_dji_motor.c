@@ -49,16 +49,19 @@ static float DjiMotorWrapPi(float angle)
 /**
  * @brief 计算GM6020位置环目标角度分支
  * @param motor DJI电机对象指针
+ * @param position_feedback 连续位置反馈（rad）
+ * @param omega_feedback 角速度反馈（rad/s）
  * @return 位置目标角度（rad）
  */
-static float DjiMotorPositionReference(const DjiMotor *motor)
+static float DjiMotorPositionReference(const DjiMotor *motor,
+                                       float position_feedback,
+                                       float omega_feedback)
 {
   float candidate_angle =
-      motor->state.continuous_angle +
-      motor->state.omega * motor->state.position_loop.sampling_time;
-  float turn_count =
-      roundf((candidate_angle - motor->state.given_angle) /
-             (2.0f * (float)M_PI));
+      position_feedback +
+      omega_feedback * motor->state.position_loop.sampling_time;
+  float turn_count = roundf((candidate_angle - motor->state.given_angle) /
+                            (2.0f * (float)M_PI));
   return motor->state.given_angle + turn_count * 2.0f * (float)M_PI;
 }
 
@@ -179,7 +182,8 @@ void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data)
 
   if (motor->type == kDjiMotorM3508 || motor->type == kDjiMotorGm6020)
   {
-    motor->state.temperature = (float)rx_data[6];
+    motor->state.temperature =
+        (float)(motor->type == kDjiMotorGm6020 ? rx_data[7] : rx_data[6]);
   }
 }
 
@@ -188,6 +192,26 @@ void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data)
  * @param motor DJI电机结构体指针
  */
 void DjiMotorCurrentCalculate(DjiMotor *motor)
+{
+  if (motor == NULL)
+  {
+    return;
+  }
+  DjiMotorCurrentCalculateWithFeedback(
+      motor, motor->type == kDjiMotorGm6020 ? motor->state.continuous_angle
+                                           : motor->state.angle,
+      motor->state.omega);
+}
+
+/**
+ * @brief 根据指定反馈计算目标电流，供反馈滤波链调用
+ * @param motor DJI电机结构体指针
+ * @param position_feedback 位置反馈，GM6020使用连续角度（rad）
+ * @param omega_feedback 角速度反馈（rad/s）
+ */
+void DjiMotorCurrentCalculateWithFeedback(DjiMotor *motor,
+                                          float position_feedback,
+                                          float omega_feedback)
 {
   if (motor == NULL || !motor->state.is_enabled)
   {
@@ -199,7 +223,7 @@ void DjiMotorCurrentCalculate(DjiMotor *motor)
   case kDjiMotorModeSpeed:
   {
     motor->state.given_current = PidCalculate(
-        &motor->state.speed_loop, motor->state.given_omega, motor->state.omega);
+        &motor->state.speed_loop, motor->state.given_omega, omega_feedback);
     break;
   }
   case kDjiMotorModePosition:
@@ -207,15 +231,15 @@ void DjiMotorCurrentCalculate(DjiMotor *motor)
     float position_reference = motor->state.given_angle;
     if (motor->type == kDjiMotorGm6020)
     {
-      position_reference = DjiMotorPositionReference(motor);
+      position_reference = DjiMotorPositionReference(
+          motor, position_feedback, omega_feedback);
     }
 
     motor->state.given_omega = PidCalculate(
         &motor->state.position_loop, position_reference,
-        motor->type == kDjiMotorGm6020 ? motor->state.continuous_angle
-                                       : motor->state.angle);
+        position_feedback);
     motor->state.given_current = PidCalculate(
-        &motor->state.speed_loop, motor->state.given_omega, motor->state.omega);
+        &motor->state.speed_loop, motor->state.given_omega, omega_feedback);
     break;
   }
   default:
@@ -230,5 +254,62 @@ void DjiMotorCurrentCalculate(DjiMotor *motor)
   {
     motor->state.given_current = DjiMotorClamp(motor->state.given_current,
                                                -current_limit, current_limit);
+  }
+}
+
+/**
+ * @brief 按DJI指令组ID封装四路电流，未分配或未使能的通道为零
+ * @param motors 电机对象指针数组
+ * @param motor_count 电机数量，最多四个
+ * @param tx_id 指令组CAN ID
+ * @param tx_data 八字节发送缓冲区
+ */
+void DjiMotorPackCurrentGroup(DjiMotor *const motors[], uint8_t motor_count,
+                               uint32_t tx_id, uint8_t tx_data[8])
+{
+  if (tx_data == NULL)
+  {
+    return;
+  }
+  memset(tx_data, 0, 8U);
+  if (motors == NULL)
+  {
+    return;
+  }
+  for (uint8_t i = 0; i < motor_count && i < 4U; i++)
+  {
+    DjiMotor *motor = motors[i];
+    if (motor == NULL || !motor->state.is_enabled)
+    {
+      continue;
+    }
+    uint32_t first_id;
+    uint32_t last_id;
+    if (motor->type == kDjiMotorGm6020 &&
+        (tx_id == 0x1FFU || tx_id == 0x2FFU))
+    {
+      first_id = tx_id == 0x1FFU ? 0x205U : 0x209U;
+      last_id = tx_id == 0x1FFU ? 0x208U : 0x20BU;
+    }
+    else if ((motor->type == kDjiMotorM2006 ||
+              motor->type == kDjiMotorM3508) &&
+             (tx_id == 0x200U || tx_id == 0x1FFU))
+    {
+      first_id = tx_id == 0x200U ? 0x201U : 0x205U;
+      last_id = first_id + 3U;
+    }
+    else
+    {
+      continue;
+    }
+    if (motor->state.id < first_id || motor->state.id > last_id)
+    {
+      continue;
+    }
+    uint32_t slot = motor->state.id - first_id;
+    uint16_t current = (uint16_t)DjiMotorCurrentAmperesToUnits(
+        motor->type, motor->state.given_current);
+    tx_data[2U * slot] = (uint8_t)(current >> 8);
+    tx_data[2U * slot + 1U] = (uint8_t)current;
   }
 }

@@ -11,8 +11,7 @@ typedef struct
   uint16_t length;
 } StreamBuffer;
 
-void StreamBufferInit(StreamBuffer *stream, uint8_t *buffer,
-                      uint16_t capacity);
+void StreamBufferInit(StreamBuffer *stream, uint8_t *buffer, uint16_t capacity);
 void StreamBufferAppend(StreamBuffer *stream, const uint8_t *data,
                         uint16_t length);
 void StreamBufferConsume(StreamBuffer *stream, uint16_t length);

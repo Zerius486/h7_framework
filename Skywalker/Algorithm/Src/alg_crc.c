@@ -63,7 +63,7 @@ uint16_t crc16_table[256] = {
 /**
  * @brief 获取CRC8校验值
  * @param data 数据指针
- * @param len 数据长度
+ * @param len 数据长度（字节）
  * @return CRC8校验值
  */
 uint8_t GetCrc8(uint8_t *data, uint16_t len)
@@ -82,7 +82,7 @@ uint8_t GetCrc8(uint8_t *data, uint16_t len)
 /**
  * @brief 获取CRC16校验值
  * @param data 数据指针
- * @param len 数据长度
+ * @param len 数据长度（字节）
  * @return CRC16校验值
  */
 uint16_t GetCrc16(uint8_t *data, uint16_t len)
@@ -101,8 +101,9 @@ uint16_t GetCrc16(uint8_t *data, uint16_t len)
 /**
  * @brief 检查CRC8校验值
  * @param data 数据指针
- * @param len 数据长度
- * @return 校验结果
+ * @param len 含校验值的数据长度（字节）
+ * @return
+ * true表示校验通过，false表示校验失败
  */
 bool CheckCrc8(uint8_t *data, uint16_t len)
 {
@@ -115,8 +116,9 @@ bool CheckCrc8(uint8_t *data, uint16_t len)
 /**
  * @brief 检查CRC16校验值
  * @param data 数据指针
- * @param len 数据长度
- * @return 校验结果
+ * @param len 含校验值的数据长度（字节）
+ * @return
+ * true表示校验通过，false表示校验失败
  */
 bool CheckCrc16(uint8_t *data, uint16_t len)
 {
