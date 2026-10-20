@@ -148,8 +148,7 @@ void RefereeRxCallback(RefereeObject *referee, uint8_t *rx_buffer,
     uint16_t data_length = RefereeFrameDataLength(frame);
     uint16_t frame_length = (uint16_t)(data_length + kRefereeFrameMinLength);
 
-    if (frame_length < kRefereeFrameMinLength ||
-        frame_length > kUartBufferSize)
+    if (frame_length < kRefereeFrameMinLength || frame_length > kUartBufferSize)
     {
       offset++;
       continue;
@@ -287,7 +286,6 @@ void RefereeUpdate(RefereeObject *referee)
     default:
       break;
     }
-
   }
 }
 

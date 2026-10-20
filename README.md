@@ -1,93 +1,64 @@
 # H7 Framework
 
-这是一个基于 STM32H723、HAL、FreeRTOS 和 CMSIS-DSP 的 CMake 工程框架。
-工程已经包含 STM32CubeMX 生成的底层代码，以及 `Skywalker` BSP、算法、设备和应用层代码。
+面向 RoboMaster 的 STM32H723 固件工程，基于 STM32 HAL、FreeRTOS 和 CMSIS-DSP。Skywalker 提供外设封装、设备驱动、控制算法与应用任务接口。
 
-## 编译链配置
+## 构建
 
-工程使用以下编译工具：
+安装 CMake 3.22+、Ninja 和 ARM GNU Toolchain，并将工具加入 `PATH`。在工程根目录执行：
 
-- CMake 3.22 或更高版本
-- Ninja
-- ARM GNU Toolchain，提供 `arm-none-eabi-gcc`、`arm-none-eabi-g++`、`arm-none-eabi-objcopy` 和 `arm-none-eabi-size`
-
-## 配置和构建
-
-在工程根目录执行：
-
-```powershell
+```sh
 cmake --preset Debug
 cmake --build --preset Debug
 ```
 
-Release 构建：
+发布构建使用 `Release` 预设。产物位于 `build/Debug/` 或 `build/Release/`，包括 `h7_framework.elf` 和链接映射文件。使用 STM32CubeProgrammer 或调试器烧录 ELF。外设、引脚和时钟由 `h7_framework.ioc` 管理。
 
-```powershell
-cmake --preset Release
-cmake --build --preset Release
-```
+## 工程结构
 
-生成文件位于：
+| 目录 | 职责 |
+| --- | --- |
+| `Core/` | 板级启动、时钟、外设和 FreeRTOS 配置 |
+| `Drivers/` | STM32 HAL、CMSIS 与 CMSIS-DSP |
+| `Middlewares/` | FreeRTOS |
+| `Skywalker/BSP/` | UART、CAN、SPI、流缓存、DWT 计时等封装 |
+| `Skywalker/Device/` | 电机、遥控器和 IMU 驱动 |
+| `Skywalker/Algorithm/` | 控制、滤波、状态估计、运动学、辨识和整定 |
+| `Skywalker/Application/` | 机器人配置、任务业务及通信协议 |
+| `cmake/` | ARM 工具链和固件构建配置 |
+| `docs/` | 应用开发和算法说明 |
 
-```text
-build/Debug/
-build/Release/
-```
+## 配置与控制逻辑
 
-其中 ELF 文件名跟随 `CMakeLists.txt` 中的工程名。工程也会生成 `compile_commands.json`，可供 VS Code、clangd 等代码分析工具使用。
+使用者主要通过修改 `app_robot.c`、`app_config.c`、`app_protocol.h/.c`，实现针对特定机器人的控制逻辑。
 
-## 控制逻辑的具体实现
+| 文件 | 内容 |
+| --- | --- |
+| `Skywalker/Application/Src/app_config.c` | 板卡角色、控制来源、通信映射、机构参数和设备/算法初始化 |
+| `Skywalker/Application/Inc/app_config.h` | 配置类型及应用对象的公共声明 |
+| `Skywalker/Application/Src/app_robot.c` | 管理、云台、底盘和发射任务的控制逻辑 |
+| `Skywalker/Application/Inc/app_protocol.h` | 自定义消息字段和通信接口 |
+| `Skywalker/Application/Src/app_protocol.c` | 协议接收、编解码和发送 |
 
-当前应用入口文件是：
+`AppConfigInit()` 在外设与 RTOS 内核初始化后、任务创建前调用一次。四组 `TaskInit()` 返回周期，单位为 ms；`TaskLoop()` 负责反馈处理、目标计算、闭环控制和指令发送。调度由 `app_task.c` 完成。
 
-```text
-Skywalker/Application/Src/app_robot.c
-```
+默认应用是业务骨架：四个任务周期均为 1 ms，没有初始化电机，任务循环为空；视觉串口映射为 UART10，机构参数需按实车填写。角色和控制来源配置由应用解释，不会自动启用某套控制逻辑。单板实现各机构任务；双板分别配置板卡角色、设备及板间消息。
 
-这个文件不需要改名。队员直接在其中编写自己的应用逻辑即可。
+应用层物理量采用 SI。PID 必须配置正的输出上限；速度环输出通常为电流 A，位置外环输出为角速度 rad/s。算法可以直接组合，调用方负责保持坐标、采样周期及输入输出含义一致。
 
-文件提供四组任务接口：
+## 算法
 
-```c
-ManagerTaskInit();  ManagerTaskLoop();
-GimbalTaskInit();   GimbalTaskLoop();
-ChassisTaskInit();  ChassisTaskLoop();
-ShootTaskInit();    ShootTaskLoop();
-```
+- PID、DOB、跟踪微分器、低通、中值与陷波滤波、Kalman 和 IMU EKF。
+- 全向轮、麦轮和舵轮运动学；舵轮目标约束与三次余弦修正。
+- 变化率限制、五次轨迹、轮速反算和电机模型功率缩放。
+- 固定尺寸积分 RLS、单电机自动整定与慢速参数自适应。
+- 三种底盘的落地响应测试与角速度外环整定。
+- DWT 周期计数，用于测量板端实际耗时。
 
-初始化函数返回任务周期，单位为毫秒；循环函数由 FreeRTOS 任务周期性调用。
-任务调度实现位于 `Skywalker/Application/Src/app_task.c`，通常不需要修改。
+这些模块均通过 C 接口调用。整定的激励输出、任务切换和参数保存由应用实现。
 
-如果需要保留多个应用版本，可以在工程外备份，或者在 `Skywalker/Application/Src` 中只保留当前正在使用的一个应用实现文件。多个文件同时定义同名任务接口会导致链接时重复定义。
+## 文档
 
-## 常见问题
-
-### 找不到编译器/CMake/Ninja
-
-请确认所有的这些编译链工具的路径都已经成功添加入PATH, 如果发现没有的话请自行学习环境变量的配置方法。
-
-### 如何修改工程名
-
-打开根目录下的 `CMakeLists.txt`，修改项目名：
-
-```cmake
-set(CMAKE_PROJECT_NAME h7_framework)
-```
-
-例如改为：
-
-```cmake
-set(CMAKE_PROJECT_NAME team_a_robot)
-```
-
-这个名称会用于生成目标文件、ELF 文件和 map 文件。修改后建议删除旧的构建目录，再重新配置。
-
-如果工程使用 Release 配置，也需要删除 `build\Release`。
-
-### 链接时出现任务函数重复定义
-
-检查 `Skywalker/Application/Src` 中是否同时存在多个定义了 `ManagerTaskInit`、`GimbalTaskInit`、`ChassisTaskInit` 或 `ShootTaskInit` 的应用文件。只保留当前使用的应用实现。
-
-### Ninja 无法写入构建目录
-
-确认没有其他 CMake/Ninja 构建进程正在使用该目录，并检查目录权限。必要时关闭 IDE 的后台构建任务后，删除构建目录并重新配置。
+- [框架结构](docs/framework-guide.md)
+- [应用开发](docs/manual-application.md)
+- [自动整定与辨识](docs/autotune.md)
+- [下位机算法路线与研究来源](docs/algorithm-roadmap.md)

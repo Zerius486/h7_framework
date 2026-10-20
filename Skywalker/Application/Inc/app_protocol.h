@@ -1,3 +1,10 @@
+/**
+ * @file app_protocol.h
+ * @brief 机器人通信协议定义
+ * @attention
+ * 本文件与 app_robot.c 平级，按机器人需求配置协议字段和通信接口。
+ */
+
 #ifndef APP_PROTOCOL_H
 #define APP_PROTOCOL_H
 

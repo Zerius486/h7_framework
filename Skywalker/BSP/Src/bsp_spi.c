@@ -69,8 +69,7 @@ void SpiTransmitReceive(SPI_HandleTypeDef *hspi, uint8_t *tx_data,
 
 HAL_StatusTypeDef SpiTransmitReceiveBlocking(SPI_HandleTypeDef *hspi,
                                              uint8_t *tx_data, uint8_t *rx_data,
-                                             uint16_t length,
-                                             uint32_t timeout)
+                                             uint16_t length, uint32_t timeout)
 {
   uint32_t index = SpiIndex(hspi);
   if (index == 0xFFU || tx_data == NULL || rx_data == NULL || length == 0U ||

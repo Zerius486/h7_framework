@@ -7,7 +7,7 @@
  * @param xhat_size 状态向量大小
  * @param u_size 控制向量大小
  * @param z_size 观测向量大小
- * @return 工作区所需float元素个数
+ * @return 工作区所需的float元素个数
  */
 uint32_t KfWorkspaceSize(uint8_t xhat_size, uint8_t u_size, uint8_t z_size)
 {
@@ -47,7 +47,7 @@ static void KfCopyVector(float *dst, const float *src, uint16_t size)
   memcpy(dst, src, (uint32_t)size * sizeof(float));
 }
 /**
- * @brief 释放卡尔曼滤波器资源
+ * @brief 重置卡尔曼滤波器对象
  * @param kf 卡尔曼滤波器对象指针
  */
 void KfDeinit(KfObject *kf)
@@ -59,13 +59,13 @@ void KfDeinit(KfObject *kf)
   memset(kf, 0, sizeof(*kf));
 }
 /**
- * @brief 卡尔曼滤波器初始化函数
+ * @brief 初始化卡尔曼滤波器
  * @param kf 卡尔曼滤波器对象指针
  * @param xhat_size 状态向量大小
  * @param u_size 控制向量大小
  * @param z_size 观测向量大小
  * @param workspace 工作区指针
- * @param workspace_size 工作区大小
+ * @param workspace_size 工作区的float元素个数
  * @return 0表示成功，-1表示失败
  */
 int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size,
@@ -77,8 +77,8 @@ int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size,
   {
     return -1;
   }
-  if (workspace == NULL || workspace_size <
-                              KfWorkspaceSize(xhat_size, u_size, z_size))
+  if (workspace == NULL ||
+      workspace_size < KfWorkspaceSize(xhat_size, u_size, z_size))
   {
     return -1;
   }
@@ -86,12 +86,12 @@ int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size,
   kf->xhat_size = xhat_size;
   kf->u_size = u_size;
   kf->z_size = z_size;
-#define KF_ALLOC(pointer, count)                                             \
-  do                                                                         \
-  {                                                                          \
-    (pointer) = &workspace[offset];                                          \
-    memset((pointer), 0, (count) * sizeof(float));                           \
-    offset += (count);                                                       \
+#define KF_ALLOC(pointer, count)                                               \
+  do                                                                           \
+  {                                                                            \
+    (pointer) = &workspace[offset];                                            \
+    memset((pointer), 0, (count) * sizeof(float));                             \
+    offset += (count);                                                         \
   } while (0)
   KF_ALLOC(kf->xhat_data, xhat_size);
   KF_ALLOC(kf->xhat_minus_data, xhat_size);
@@ -214,7 +214,8 @@ arm_status KfPredict(KfObject *kf)
  * @brief 卡尔曼滤波器更新步骤
  * @param kf 卡尔曼滤波器对象指针
  * @param z_measurement 观测值指针
- * @return 执行状态，ARM_MATH_SUCCESS表示成功，其他值表示失败
+ * @return
+ * 执行状态，ARM_MATH_SUCCESS表示成功，其他值表示失败
  */
 arm_status KfUpdate(KfObject *kf, const float *z_measurement)
 {
@@ -297,7 +298,8 @@ arm_status KfUpdate(KfObject *kf, const float *z_measurement)
  * @param kf 卡尔曼滤波器对象指针
  * @param u 控制输入指针，如果为NULL则不更新控制输入
  * @param z_measurement 观测值指针
- * @return 执行状态，ARM_MATH_SUCCESS表示成功，其他值表示失败
+ * @return
+ * 执行状态，ARM_MATH_SUCCESS表示成功，其他值表示失败
  */
 arm_status KfStep(KfObject *kf, const float *u, const float *z_measurement)
 {

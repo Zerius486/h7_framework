@@ -4,7 +4,7 @@
 typedef struct
 {
   float x1; // 跟踪信号
-  float x2; // 微分信号
+  float x2; // 跟踪信号微分
   float r;  // 速度因子
   float h;  // 滤波因子
 } TdNlObject;

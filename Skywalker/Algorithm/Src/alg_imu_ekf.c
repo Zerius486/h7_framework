@@ -53,8 +53,8 @@ static float EkfSafeCos(float x)
 }
 /**
  * @brief 过程模型与状态雅可比
- * @param ekf ekf对象指针
- * @param gyro 陀螺仪输入
+ * @param ekf EKF对象指针
+ * @param gyro 陀螺仪角速度输入（rad/s）
  */
 static void EkfPredictModelAndJacobian(ImuEkfObject *ekf,
                                        const float gyro[kEkfImuInputSize])
@@ -101,7 +101,7 @@ static void EkfPredictModelAndJacobian(ImuEkfObject *ekf,
 }
 /**
  * @brief 观测模型与观测雅可比
- * @param ekf ekf对象指针
+ * @param ekf EKF对象指针
  */
 static void EkfMeasurementModelAndJacobian(ImuEkfObject *ekf)
 {
@@ -126,10 +126,10 @@ static void EkfMeasurementModelAndJacobian(ImuEkfObject *ekf)
   h[2 * kEkfImuStateSize + 1] = -g * cos_phi * sin_theta;
 }
 /**
- * @brief 初始化imu_ekf
- * @param ekf ekf对象指针
- * @param dt 采样周期
- * @param gravity 重力常数
+ * @brief 初始化IMU EKF
+ * @param ekf EKF对象指针
+ * @param dt 采样时间（s）
+ * @param gravity 重力加速度（m/s²）
  * @return 0表示成功，-1表示失败
  */
 int8_t ImuEkfInit(ImuEkfObject *ekf, float dt, float gravity)
@@ -259,9 +259,9 @@ void ImuEkfSetEuler(ImuEkfObject *ekf, float roll, float pitch, float yaw)
 /**
  * @brief 执行EKF
  * @param ekf EKF对象指针
- * @param gyro 陀螺仪输入
- * @param accel 加速度输入
- * @return ARM_MATH_SUCCESS表示成功
+ * @param gyro 陀螺仪角速度输入（rad/s）
+ * @param accel 加速度输入（m/s²）
+ * @return ARM_MATH_SUCCESS表示成功，其他值表示失败
  */
 arm_status ImuEkfStep(ImuEkfObject *ekf, const float gyro[kEkfImuInputSize],
                       const float accel[kEkfImuMeasSize])
@@ -401,7 +401,7 @@ void ImuEkfGetEuler(const ImuEkfObject *ekf, float *roll, float *pitch,
 /**
  * @brief 获取陀螺零偏估计
  * @param ekf EKF对象指针
- * @param bias 零偏输出
+ * @param bias 陀螺仪零偏输出（rad/s）
  */
 void ImuEkfGetGyroBias(const ImuEkfObject *ekf, float bias[kEkfImuInputSize])
 {

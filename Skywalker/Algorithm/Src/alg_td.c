@@ -14,7 +14,7 @@ void TdInit(TdObject *td, float r)
  * @brief 更新微分追踪器
  * @param td 微分追踪器结构体指针
  * @param input 输入信号
- * @param dt 时间步长
+ * @param dt 采样时间（s）
  */
 void TdUpdate(TdObject *td, float input, float dt)
 {

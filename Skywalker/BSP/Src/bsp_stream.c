@@ -8,8 +8,7 @@
  * @param buffer 缓存数据指针
  * @param capacity 缓存容量
  */
-void StreamBufferInit(StreamBuffer *stream, uint8_t *buffer,
-                      uint16_t capacity)
+void StreamBufferInit(StreamBuffer *stream, uint8_t *buffer, uint16_t capacity)
 {
   if (stream == NULL)
   {

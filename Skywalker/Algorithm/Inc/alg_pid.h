@@ -8,7 +8,7 @@ typedef struct
   float kp;                             // 比例增益
   float ki;                             // 积分增益
   float kd;                             // 微分增益
-  float sampling_time;                  // 采样时间
+  float sampling_time;                  // 采样时间（s）
   float reference;                      // 目标值
   float feedback;                       // 反馈值
   float error;                          // 当前误差
@@ -34,7 +34,7 @@ typedef struct
   float kp;                             // 比例增益
   float ki;                             // 积分增益
   float kd;                             // 微分增益
-  float sampling_time;                  // 采样时间
+  float sampling_time;                  // 采样时间（s）
   bool is_derivativeonfeedback_enabled; // 微分先行使能标志
   bool is_feedforward_enabled;          // 前馈使能标志
   float kff;                            // 前馈增益
@@ -49,4 +49,7 @@ typedef struct
 void PidReset(PidObject *pid_object);
 void PidInit(PidObject *pid_object, PidConfig *pid_config);
 float PidCalculate(PidObject *pid_object, float reference, float feedback);
+bool PidSetGains(PidObject *pid_object, float kp, float ki, float kd);
+void PidTrackOutput(PidObject *pid_object, float output_difference,
+                    float tracking_rate);
 #endif // ALG_PID_H

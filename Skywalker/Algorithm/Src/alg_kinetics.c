@@ -5,8 +5,8 @@
 static const float kSteerWheelSpeedEpsilon = 1e-4f;
 /**
  * @brief 将角度归一化到[-pi, pi]
- * @param angle 输入角度
- * @return 归一化后的角度
+ * @param angle 输入角度（rad）
+ * @return 归一化后的角度（rad）
  */
 static float ChassisWrapPi(float angle)
 {
@@ -31,18 +31,20 @@ void ChassisInit(Chassis *chassis, ChassisType type)
   chassis->velocity.vx = 0.0f;
   chassis->velocity.vy = 0.0f;
   chassis->velocity.omega = 0.0f;
+  chassis->has_wheel_angle_feedback = false;
   for (int i = 0; i < 4; i++)
   {
     chassis->state.wheel_speed[i] = 0.0f;
     chassis->state.wheel_angle[i] = 0.0f;
+    chassis->wheel_angle_feedback[i] = 0.0f;
   }
 }
 /**
  * @brief 设置底盘速度
  * @param chassis 底盘结构体指针
- * @param vx x方向速度
- * @param vy y方向速度
- * @param omega 旋转速度
+ * @param vx x方向速度（m/s）
+ * @param vy y方向速度（m/s）
+ * @param omega 旋转角速度（rad/s）
  */
 void ChassisSetVelocity(Chassis *chassis, float vx, float vy, float omega)
 {
@@ -53,13 +55,26 @@ void ChassisSetVelocity(Chassis *chassis, float vx, float vy, float omega)
 /**
  * @brief 设置底盘参数
  * @param chassis 底盘结构体指针
- * @param lx x方向半轮距
- * @param ly y方向半轮距
+ * @param lx x方向半轮距（m）
+ * @param ly y方向半轮距（m）
  */
 void ChassisSetParams(Chassis *chassis, float lx, float ly)
 {
   chassis->params.lx = lx;
   chassis->params.ly = ly;
+}
+/**
+ * @brief 设置舵轮实际转角，用于选择最短转向路径
+ * @param chassis 底盘结构体指针
+ * @param angle 四轮实际转角（rad）
+ */
+void ChassisSetWheelAngleFeedback(Chassis *chassis, const float angle[4])
+{
+  for (int i = 0; i < 4; i++)
+  {
+    chassis->wheel_angle_feedback[i] = angle[i];
+  }
+  chassis->has_wheel_angle_feedback = true;
 }
 /**
  * @brief 更新底盘状态
@@ -87,8 +102,10 @@ void ChassisUpdateState(Chassis *chassis)
       if (chassis->state.wheel_speed[i] > kSteerWheelSpeedEpsilon)
       {
         float wheel_angle = atan2f(vy[i], vx[i]);
-        float angle_error =
-            ChassisWrapPi(wheel_angle - chassis->state.wheel_angle[i]);
+        float angle_feedback = chassis->has_wheel_angle_feedback
+                                   ? chassis->wheel_angle_feedback[i]
+                                   : chassis->state.wheel_angle[i];
+        float angle_error = ChassisWrapPi(wheel_angle - angle_feedback);
         if (fabsf(angle_error) > (float)M_PI / 2.0f)
         {
           chassis->state.wheel_speed[i] = -chassis->state.wheel_speed[i];
@@ -101,31 +118,35 @@ void ChassisUpdateState(Chassis *chassis)
   }
   case kMecanumWheel:
     chassis->state.wheel_speed[0] =
-        chassis->velocity.vx - chassis->velocity.vy +
+        chassis->velocity.vx - chassis->velocity.vy -
         chassis->velocity.omega * (chassis->params.lx + chassis->params.ly);
     chassis->state.wheel_speed[1] =
-        -chassis->velocity.vx - chassis->velocity.vy +
+        chassis->velocity.vx + chassis->velocity.vy -
         chassis->velocity.omega * (chassis->params.lx + chassis->params.ly);
     chassis->state.wheel_speed[2] =
-        -chassis->velocity.vx + chassis->velocity.vy -
+        chassis->velocity.vx - chassis->velocity.vy +
         chassis->velocity.omega * (chassis->params.lx + chassis->params.ly);
     chassis->state.wheel_speed[3] =
-        chassis->velocity.vx + chassis->velocity.vy -
+        chassis->velocity.vx + chassis->velocity.vy +
         chassis->velocity.omega * (chassis->params.lx + chassis->params.ly);
     break;
   case kOmniWheel:
     chassis->state.wheel_speed[0] =
-        kSqrt2 / 2 * (chassis->velocity.vx + chassis->velocity.vy) +
-        chassis->velocity.omega * (chassis->params.lx + chassis->params.ly);
-    chassis->state.wheel_speed[1] =
         kSqrt2 / 2 * (-chassis->velocity.vx + chassis->velocity.vy) +
-        chassis->velocity.omega * (chassis->params.lx + chassis->params.ly);
-    chassis->state.wheel_speed[2] =
+        kSqrt2 / 2 * chassis->velocity.omega *
+            (chassis->params.lx + chassis->params.ly);
+    chassis->state.wheel_speed[1] =
         kSqrt2 / 2 * (-chassis->velocity.vx - chassis->velocity.vy) +
-        chassis->velocity.omega * (chassis->params.lx + chassis->params.ly);
-    chassis->state.wheel_speed[3] =
+        kSqrt2 / 2 * chassis->velocity.omega *
+            (chassis->params.lx + chassis->params.ly);
+    chassis->state.wheel_speed[2] =
         kSqrt2 / 2 * (chassis->velocity.vx - chassis->velocity.vy) +
-        chassis->velocity.omega * (chassis->params.lx + chassis->params.ly);
+        kSqrt2 / 2 * chassis->velocity.omega *
+            (chassis->params.lx + chassis->params.ly);
+    chassis->state.wheel_speed[3] =
+        kSqrt2 / 2 * (chassis->velocity.vx + chassis->velocity.vy) +
+        kSqrt2 / 2 * chassis->velocity.omega *
+            (chassis->params.lx + chassis->params.ly);
     break;
   default:
     break;

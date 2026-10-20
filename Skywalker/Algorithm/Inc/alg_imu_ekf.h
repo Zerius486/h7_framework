@@ -10,12 +10,12 @@ enum
   kEkfImuInputSize = 3U,
 };
 
-// imu_ekf结构体
+// IMU EKF结构体
 typedef struct
 {
-  float dt;
-  float gravity;
-  uint8_t is_inited;
+  float dt;                        // 采样时间（s）
+  float gravity;                   // 重力加速度（m/s²）
+  uint8_t is_inited;               // 初始化标志
   arm_matrix_instance_f32 x;       // 当前状态
   arm_matrix_instance_f32 x_minus; // 预测状态
   arm_matrix_instance_f32 p;       // 当前协方差

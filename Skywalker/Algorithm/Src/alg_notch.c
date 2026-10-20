@@ -5,9 +5,9 @@
 /**
  * @brief 初始化陷波滤波器
  * @param notch_filter 陷波滤波器指针
- * @param f0 陷波频率
+ * @param f0 陷波频率（Hz）
  * @param q 品质因数
- * @param fs 采样频率
+ * @param fs 采样频率（Hz）
  */
 void NotchFilterInit(NotchFilterObject *notch_filter, float f0, float q,
                      float fs)
