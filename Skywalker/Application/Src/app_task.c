@@ -9,14 +9,34 @@ static uint32_t AppTaskNormalizePeriod(uint32_t period_ms)
 }
 
 // 默认为空实现，Application层可覆盖。
-__weak uint32_t ManagerTaskInit(void) { return 1U; }
-__weak void ManagerTaskLoop(void) {}
-__weak uint32_t GimbalTaskInit(void) { return 1U; }
-__weak void GimbalTaskLoop(void) {}
-__weak uint32_t ChassisTaskInit(void) { return 1U; }
-__weak void ChassisTaskLoop(void) {}
-__weak uint32_t ShootTaskInit(void) { return 1U; }
-__weak void ShootTaskLoop(void) {}
+__weak uint32_t ManagerTaskInit(void)
+{
+  return 1U;
+}
+__weak void ManagerTaskLoop(void)
+{
+}
+__weak uint32_t GimbalTaskInit(void)
+{
+  return 1U;
+}
+__weak void GimbalTaskLoop(void)
+{
+}
+__weak uint32_t ChassisTaskInit(void)
+{
+  return 1U;
+}
+__weak void ChassisTaskLoop(void)
+{
+}
+__weak uint32_t ShootTaskInit(void)
+{
+  return 1U;
+}
+__weak void ShootTaskLoop(void)
+{
+}
 
 /**
  * @brief Manager线程入口，覆盖CubeMX生成的weak函数

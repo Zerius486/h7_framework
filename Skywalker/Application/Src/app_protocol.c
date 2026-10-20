@@ -1,12 +1,19 @@
+/**
+ * @file app_protocol.c
+ * @brief 机器人通信协议实现
+ * @attention
+ * 本文件与 app_robot.c 平级，按机器人需求配置协议编解码和通信外设。
+ */
+
 #include "app_protocol.h"
 
 #include <stdbool.h>
 #include <string.h>
 
 #include "alg_crc.h"
+#include "app_config.h"
 #include "bsp_stream.h"
 #include "bsp_uart.h"
-#include "usart.h"
 
 GimbalToVision g_gimbal_to_vision = {
     .head = {'A', 'B'},
@@ -62,6 +69,9 @@ void VisionProtocolRxCallback(uint8_t *rx_buffer, uint16_t rx_length)
   StreamBufferConsume(&g_vision_rx_stream_buffer, offset);
 }
 
+/**
+ * @brief 通过配置的视觉串口发送云台状态
+ */
 void VisionProtocolTransmitGimbalState(void)
 {
   g_gimbal_to_vision.head[0] = 'A';
@@ -73,5 +83,6 @@ void VisionProtocolTransmitGimbalState(void)
       GetCrc16(tx_buffer, (uint16_t)(sizeof(tx_buffer) - sizeof(uint16_t)));
   tx_buffer[sizeof(tx_buffer) - 2U] = (uint8_t)(crc16 & 0xFFU);
   tx_buffer[sizeof(tx_buffer) - 1U] = (uint8_t)(crc16 >> 8);
-  UartTransmit(&huart10, tx_buffer, sizeof(tx_buffer));
+  UartTransmit(g_app_communication_config.vision_huart, tx_buffer,
+               sizeof(tx_buffer));
 }

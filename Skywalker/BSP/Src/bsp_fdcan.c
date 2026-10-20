@@ -34,15 +34,9 @@ static uint8_t FdcanIndex(FDCAN_HandleTypeDef *hfdcan)
 static uint32_t FdcanLengthToDlc(uint32_t length)
 {
   static const uint32_t kClassicCanDlc[] = {
-      FDCAN_DLC_BYTES_0,
-      FDCAN_DLC_BYTES_1,
-      FDCAN_DLC_BYTES_2,
-      FDCAN_DLC_BYTES_3,
-      FDCAN_DLC_BYTES_4,
-      FDCAN_DLC_BYTES_5,
-      FDCAN_DLC_BYTES_6,
-      FDCAN_DLC_BYTES_7,
-      FDCAN_DLC_BYTES_8,
+      FDCAN_DLC_BYTES_0, FDCAN_DLC_BYTES_1, FDCAN_DLC_BYTES_2,
+      FDCAN_DLC_BYTES_3, FDCAN_DLC_BYTES_4, FDCAN_DLC_BYTES_5,
+      FDCAN_DLC_BYTES_6, FDCAN_DLC_BYTES_7, FDCAN_DLC_BYTES_8,
   };
 
   if (length > 8U)
@@ -167,8 +161,7 @@ void FdcanTransmit(FDCAN_HandleTypeDef *hfdcan, uint8_t *tx_data,
  * @param hfdcan FDCAN句柄
  * @param RxFifo0ITs FIFO0中断标志
  */
-void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan,
-                               uint32_t RxFifo0ITs)
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
   if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == 0U)
   {
@@ -198,8 +191,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan,
  * @param hfdcan FDCAN句柄
  * @param RxFifo1ITs FIFO1中断标志
  */
-void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan,
-                               uint32_t RxFifo1ITs)
+void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
 {
   if ((RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE) == 0U)
   {

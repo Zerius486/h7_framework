@@ -22,20 +22,20 @@ static const float kDjiGm6020MotorCurrentLimitA = 3.0000f;
 // DJI电机状态结构体
 typedef struct
 {
-  bool is_enabled;         // 电机使能标志
-  uint32_t id;             // 电机ID
-  float angle;             // 当前角度（rad）
-  float continuous_angle;  // 当前连续角度（rad）
-  float last_angle;        // 上一次单圈角度（rad）
+  bool is_enabled;           // 电机使能标志
+  uint32_t id;               // 电机ID
+  float angle;               // 当前角度（rad）
+  float continuous_angle;    // 当前连续角度（rad）
+  float last_angle;          // 上一次单圈角度（rad）
   bool is_angle_initialized; // 连续角度初始化标志
-  float given_angle;       // 目标角度（rad）
-  float omega;             // 当前角速度（rad/s）
-  float given_omega;       // 目标角速度（rad/s）
-  float current;           // 当前电流（A）
-  float given_current;     // 目标电流（A）
-  float temperature;       // 温度（℃）
-  PidObject speed_loop;    // 速度环PID控制器
-  PidObject position_loop; // 位置环PID控制器
+  float given_angle;         // 目标角度（rad）
+  float omega;               // 当前角速度（rad/s）
+  float given_omega;         // 目标角速度（rad/s）
+  float current;             // 当前电流（A）
+  float given_current;       // 目标电流（A）
+  float temperature;         // 温度（℃）
+  PidObject speed_loop;      // 速度环PID控制器
+  PidObject position_loop;   // 位置环PID控制器
 } DjiMotorState;
 
 // DJI电机类型枚举
@@ -69,5 +69,10 @@ void DjiMotorInit(DjiMotor *motor, DjiMotorType type, DjiMotorMode mode,
                   PidConfig *speed_pid_config, PidConfig *position_pid_config);
 void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data);
 void DjiMotorCurrentCalculate(DjiMotor *motor);
+void DjiMotorCurrentCalculateWithFeedback(DjiMotor *motor,
+                                          float position_feedback,
+                                          float omega_feedback);
+void DjiMotorPackCurrentGroup(DjiMotor *const motors[], uint8_t motor_count,
+                               uint32_t tx_id, uint8_t tx_data[8]);
 
 #endif // DEV_DJI_MOTOR_H
