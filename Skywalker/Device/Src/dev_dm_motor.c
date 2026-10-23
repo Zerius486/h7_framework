@@ -75,7 +75,7 @@ static void DmMotorPackFloat(float value, uint8_t tx_data[4])
 }
 
 /**
- * @brief 将目标力矩转换为达妙电流单位值
+ * @brief 将J4310目标力矩转换为电流单位值
  * @param torque_nm 目标力矩（Nm）
  * @return 电流单位值
  */
@@ -86,7 +86,7 @@ float DmMotorTorqueToCurrentUnits(float torque_nm)
 }
 
 /**
- * @brief 将达妙电流单位值转换为估计力矩
+ * @brief 将J4310电流单位值转换为估计力矩
  * @param current_units 电流单位值
  * @return 估计力矩（Nm）
  */
@@ -134,6 +134,16 @@ void DmMotorInit(DmMotor *motor, DmMotorType type, DmMotorMode mode,
   motor->state.master_id = master_id;
   motor->state.velocity_limit = kDmForcePositionDefaultVelocityLimit;
   motor->state.current_limit = (uint16_t)kDmMotorCurrentUnitsMax;
+
+  motor->limits.position_max = kDmMotorPositionMax;
+  motor->limits.velocity_max = kDmMotorVelocityMax;
+  motor->limits.torque_max = kDmMotorTorqueMax;
+  if (type == kDmMotorTypeJ8009P)
+  {
+    motor->limits.position_max = kDmMotorJ8009PPositionMax;
+    motor->limits.velocity_max = kDmMotorJ8009PVelocityMax;
+    motor->limits.torque_max = kDmMotorJ8009PTorqueMax;
+  }
 }
 
 /**
@@ -155,14 +165,13 @@ void DmMotorUpdate(DmMotor *motor, const uint8_t rx_data[8])
   uint16_t torque =
       (uint16_t)((((uint16_t)rx_data[4] & 0x0FU) << 8) | (uint16_t)rx_data[5]);
 
-  motor->state.id = (uint32_t)(rx_data[0] & 0x0FU);
   motor->state.error_code = (uint8_t)(rx_data[0] >> 4);
-  motor->state.angle = DmMotorUintToFloat(position, kDmMotorPositionMin,
-                                          kDmMotorPositionMax, 16);
-  motor->state.omega = DmMotorUintToFloat(velocity, kDmMotorVelocityMin,
-                                          kDmMotorVelocityMax, 12);
-  motor->state.torque =
-      DmMotorUintToFloat(torque, kDmMotorTorqueMin, kDmMotorTorqueMax, 12);
+  motor->state.angle = DmMotorUintToFloat(position, -motor->limits.position_max,
+                                          motor->limits.position_max, 16);
+  motor->state.omega = DmMotorUintToFloat(velocity, -motor->limits.velocity_max,
+                                          motor->limits.velocity_max, 12);
+  motor->state.torque = DmMotorUintToFloat(torque, -motor->limits.torque_max,
+                                           motor->limits.torque_max, 12);
   motor->state.temperature_mos = (float)rx_data[6];
   motor->state.temperature_rotor = (float)rx_data[7];
 }
@@ -246,16 +255,19 @@ void DmMotorPackMit(const DmMotor *motor, uint8_t tx_data[8])
     return;
   }
 
-  uint16_t position = DmMotorFloatToUint(
-      motor->state.given_angle, kDmMotorPositionMin, kDmMotorPositionMax, 16);
-  uint16_t velocity = DmMotorFloatToUint(
-      motor->state.given_omega, kDmMotorVelocityMin, kDmMotorVelocityMax, 12);
+  uint16_t position =
+      DmMotorFloatToUint(motor->state.given_angle, -motor->limits.position_max,
+                         motor->limits.position_max, 16);
+  uint16_t velocity =
+      DmMotorFloatToUint(motor->state.given_omega, -motor->limits.velocity_max,
+                         motor->limits.velocity_max, 12);
   uint16_t kp =
       DmMotorFloatToUint(motor->state.kp, kDmMotorKpMin, kDmMotorKpMax, 12);
   uint16_t kd =
       DmMotorFloatToUint(motor->state.kd, kDmMotorKdMin, kDmMotorKdMax, 12);
-  uint16_t torque = DmMotorFloatToUint(
-      motor->state.given_torque, kDmMotorTorqueMin, kDmMotorTorqueMax, 12);
+  uint16_t torque =
+      DmMotorFloatToUint(motor->state.given_torque, -motor->limits.torque_max,
+                         motor->limits.torque_max, 12);
 
   tx_data[0] = (uint8_t)(position >> 8);
   tx_data[1] = (uint8_t)(position & 0xFFU);

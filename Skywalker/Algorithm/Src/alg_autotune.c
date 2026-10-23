@@ -65,7 +65,8 @@ static void AutotuneIdentifyInit(AutotuneObject *tune, float memory_time)
                             fmaxf(0.02f, 4.0f * tune->config.sampling_time),
                         .current_scale = tune->config.current_limit,
                         .omega_scale = tune->config.speed_limit,
-                        .memory_time = memory_time};
+                        .memory_time = memory_time,
+                        .method = tune->config.identification};
   (void)SysidInit(&tune->sysid, &config);
   (void)SysidInit(&tune->rotor_sysid, &config);
 }
@@ -90,6 +91,21 @@ static void AutotuneDesign(AutotuneObject *tune, float bandwidth)
                   tune->config.sampling_time);
   AutotunePidInit(&tune->position_pid, tune->result.position_kp, 0.0f,
                   tune->config.speed_limit, tune->config.sampling_time);
+}
+
+/**
+ * @brief 保存性能优化相对模型设计的增益比例
+ * @param tune 整定对象指针
+ * @param speed 已验证的速度控制器
+ */
+static void AutotuneGainScale(AutotuneObject *tune, const PidObject *speed)
+{
+  float bandwidth = tune->result.bandwidth;
+  float inertia = tune->result.model.inertia;
+  float kp = fmaxf(2.0f * bandwidth * inertia - tune->result.model.viscous,
+                   0.1f * bandwidth * inertia);
+  tune->gain_scale[0] = speed->kp / kp;
+  tune->gain_scale[1] = speed->ki / (inertia * bandwidth * bandwidth);
 }
 
 /**
@@ -135,6 +151,8 @@ bool AutotuneInit(AutotuneObject *tune, const AutotuneConfig *config)
       !isfinite(config->speed_offset) ||
       fabsf(config->speed_offset) >= 0.7f * config->speed_limit ||
       !isfinite(config->response_time) || config->response_time < 0.0f ||
+      (config->identification != kSysidExponential &&
+       config->identification != kSysidSubspace) ||
       (config->tune_position && config->speed_offset != 0.0f))
   {
     return false;
@@ -339,6 +357,16 @@ float AutotuneUpdate(AutotuneObject *tune, float position, float omega,
     return AutotuneFail(tune, kAutotuneMotionLimit);
   }
   float dt = tune->config.sampling_time;
+  if (tune->optimization_pending)
+  {
+    tune->optimization_pending = false;
+    tune->optimization_finished =
+        !PidTuneFinish(&tune->optimizer, &tune->speed_pid);
+    tune->result.speed_kp = tune->speed_pid.kp;
+    tune->result.speed_ki = tune->speed_pid.ki;
+    AutotunePrime(tune, position, omega);
+    AutotunePhase(tune, kAutotuneSpeed);
+  }
   tune->elapsed += dt;
   tune->total_time += dt;
   float request = 0.0f;
@@ -407,6 +435,21 @@ float AutotuneUpdate(AutotuneObject *tune, float position, float omega,
     float frequency = position_test ? 0.35f * tune->result.position_kp
                                     : 0.25f * tune->result.bandwidth;
     float duration = fmaxf(3.0f, 12.5663706f / fmaxf(frequency, 0.05f));
+    if (tune->state == kAutotuneSpeed && tune->config.optimize &&
+        tune->optimizer.state == kPidTuneIdle)
+    {
+      PidTuneConfig config = {.model = tune->result.model,
+                              .sampling_time = dt,
+                              .settling_time = 0.25f * duration,
+                              .feedback_scale = tune->test_amplitude,
+                              .output_weight = 0.01f,
+                              .change_weight = 0.01f};
+      if (!PidTuneInit(&tune->optimizer, &config) ||
+          !PidTuneStart(&tune->optimizer, &tune->speed_pid))
+      {
+        return AutotuneFail(tune, kAutotuneInvalidSample);
+      }
+    }
     float phase = frequency * tune->elapsed;
     float reference =
         tune->config.speed_offset + tune->test_amplitude * sinf(phase);
@@ -430,8 +473,12 @@ float AutotuneUpdate(AutotuneObject *tune, float position, float omega,
     {
       AutotuneMeasure(tune, error / fmaxf(tune->test_amplitude, 1.0e-5f));
     }
-    request = PidCalculate(&tune->speed_pid, reference, omega);
-    if (tune->config.adaptive)
+    request = tune->state == kAutotuneSpeed && tune->config.optimize
+                  ? PidTuneCalculate(&tune->optimizer, &tune->speed_pid,
+                                     reference, omega)
+                  : PidCalculate(&tune->speed_pid, reference, omega);
+    if (tune->config.adaptive &&
+        !(tune->state == kAutotuneSpeed && tune->config.optimize))
     {
       request += AutotuneFeedforward(tune, &tune->speed_pid);
     }
@@ -472,6 +519,8 @@ float AutotuneUpdate(AutotuneObject *tune, float position, float omega,
         }
         else
         {
+          memset(&tune->optimizer, 0, sizeof(tune->optimizer));
+          tune->optimization_finished = false;
           AutotuneDesign(tune, 0.6f * tune->result.bandwidth);
           AutotunePrime(tune, position, omega);
           if (tune->config.tune_position)
@@ -480,6 +529,13 @@ float AutotuneUpdate(AutotuneObject *tune, float position, float omega,
           }
           AutotunePhase(tune, kAutotuneSpeed);
         }
+      }
+      else if (tune->state == kAutotuneSpeed && tune->config.optimize &&
+               !tune->optimization_finished &&
+               (tune->optimizer.state == kPidTuneRunning ||
+                tune->optimizer.state == kPidTuneInvalidSample))
+      {
+        tune->optimization_pending = true;
       }
       else if (tune->state == kAutotuneSpeed && tune->config.tune_position)
       {
@@ -526,6 +582,10 @@ void AutotuneTrackOutput(AutotuneObject *tune, float executed_current)
 {
   if (AutotuneIsActive(tune) && tune->state != kAutotuneIdentify)
   {
+    if (tune->state == kAutotuneSpeed && tune->config.optimize)
+    {
+      PidTuneTrackOutput(&tune->optimizer, executed_current);
+    }
     PidTrackOutput(&tune->speed_pid, executed_current - tune->requested_current,
                    tune->result.bandwidth);
   }
@@ -558,6 +618,7 @@ bool AutotuneApply(AutotuneObject *tune, PidObject *speed, PidObject *position,
   }
   tune->applied = true;
   tune->validated_model = tune->result.model;
+  AutotuneGainScale(tune, speed);
   AutotuneIdentifyInit(tune, 20.0f);
   return true;
 }
@@ -605,6 +666,7 @@ bool AutotuneRestore(AutotuneObject *tune, const SysidModel *model,
   }
   tune->state = kAutotuneComplete;
   tune->applied = true;
+  AutotuneGainScale(tune, speed);
   AutotuneIdentifyInit(tune, 20.0f);
   return true;
 }
@@ -641,6 +703,11 @@ float AutotuneAdapt(AutotuneObject *tune, PidObject *speed, float omega,
                 0.1f * tune->result.bandwidth * model.inertia);
       float ki =
           model.inertia * tune->result.bandwidth * tune->result.bandwidth;
+      if (tune->config.optimize)
+      {
+        kp *= tune->gain_scale[0];
+        ki *= tune->gain_scale[1];
+      }
       kp = AutotuneClamp(kp, 0.98f * speed->kp, 1.02f * speed->kp);
       ki = AutotuneClamp(ki, 0.98f * speed->ki, 1.02f * speed->ki);
       (void)PidSetGains(speed, kp, ki, 0.0f);
