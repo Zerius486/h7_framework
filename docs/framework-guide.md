@@ -47,4 +47,4 @@ main()
 
 Debug 和 Release 预设分别使用独立的 `build/Debug/`、`build/Release/`。增加源文件后重新运行 CMake 配置；更换业务实现时确保四组任务接口只保留一份强定义。
 
-具体开发步骤见 [应用开发](manual-application.md)，整定接口见 [自动整定与辨识](autotune.md)。
+具体开发步骤见 [应用开发](manual-application.md)，算法模块见 [算法清单与组合说明](algorithms.md)，整定接口见 [自动整定与辨识](autotune.md)。

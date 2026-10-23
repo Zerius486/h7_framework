@@ -223,6 +223,26 @@ void SteerSetpointUpdate(SteerSetpoint *setpoint, Chassis *chassis,
 }
 
 /**
+ * @brief 按实际舵角误差进行三次余弦轮速修正
+ * @param target 未修正的四轮目标
+ * @param angle 四轮实际舵角（rad）
+ * @param angle_scale 角度系数a，非负，0表示不衰减
+ * @param speed 修正后的四轮线速度（m/s）
+ */
+void SteerSpeedCorrect(const ChassisState *target, const float angle[4],
+                       float angle_scale, float speed[4])
+{
+  for (int i = 0; i < 4; i++)
+  {
+    float delta = fabsf(
+        remainderf(target->wheel_angle[i] - angle[i], 2.0f * (float)M_PI));
+    float phase = fminf(fmaxf(angle_scale, 0.0f) * delta, (float)M_PI / 2.0f);
+    float correction = fmaxf(cosf(phase), 0.0f);
+    speed[i] = target->wheel_speed[i] * correction * correction * correction;
+  }
+}
+
+/**
  * @brief 按电机模型计算非回馈功率
  * @param model 各电机功率模型
  * @param current 电流数组（A）

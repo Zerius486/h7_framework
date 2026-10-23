@@ -21,12 +21,14 @@ typedef enum
 // 落地测试配置，距离由轮速里程计检查
 typedef struct
 {
-  float sampling_time; // 采样时间（s）
-  float speed;         // 平移测试幅度（m/s）
-  float omega;         // 旋转测试指令上限（rad/s）
-  float distance;      // 相对起点轮速里程计半径（m）
-  float angle;         // 相对起点旋转范围（rad）
-  float response_time; // 角速度环期望响应时间（s）
+  float sampling_time;        // 采样时间（s）
+  float speed;                // 平移测试幅度（m/s）
+  float omega;                // 旋转测试指令上限（rad/s）
+  float distance;             // 相对起点轮速里程计半径（m）
+  float angle;                // 相对起点旋转范围（rad）
+  float response_time;        // 角速度环期望响应时间（s）
+  SysidMethod identification; // 角速度模型辨识方法
+  bool optimize;              // 优化角速度外环PI性能
 } ChassisTuneConfig;
 
 // 平移响应统计，只反映轮速反馈下的响应

@@ -3,6 +3,7 @@
 
 #include "alg_dob.h"
 #include "alg_pid.h"
+#include "alg_pid_tune.h"
 #include "alg_sysid.h"
 
 // 自动整定状态
@@ -31,15 +32,17 @@ typedef enum
 // 自动整定配置结构体，运动量与控制器反馈使用相同坐标
 typedef struct
 {
-  float sampling_time; // 采样时间（s）
-  float current_limit; // 测试电流上限（A）
-  float speed_limit;   // 测试角速度上限（rad/s）
-  float position_min;  // 连续角度下限（rad）
-  float position_max;  // 连续角度上限（rad）
-  float speed_offset;  // 速度环工作点（rad/s）
-  float response_time; // 期望响应时间（s），0表示自动选择
-  bool tune_position;  // 整定位置外环
-  bool adaptive;       // 正常运行时缓慢更新模型及增益
+  float sampling_time;        // 采样时间（s）
+  float current_limit;        // 测试电流上限（A）
+  float speed_limit;          // 测试角速度上限（rad/s）
+  float position_min;         // 连续角度下限（rad）
+  float position_max;         // 连续角度上限（rad）
+  float speed_offset;         // 速度环工作点（rad/s）
+  float response_time;        // 期望响应时间（s），0表示自动选择
+  bool tune_position;         // 整定位置外环
+  bool adaptive;              // 正常运行时缓慢更新模型及增益
+  SysidMethod identification; // 辨识更新方法
+  bool optimize;              // 验证速度环时优化PI性能
 } AutotuneConfig;
 
 // 自动整定结果结构体
@@ -69,6 +72,8 @@ typedef struct
   PidObject speed_pid;
   PidObject position_pid;
   DobObject dob;
+  PidTuneObject optimizer;
+  float gain_scale[2]; // 优化增益相对模型设计值的比例
   float elapsed;
   float total_time;
   float center;
@@ -91,6 +96,8 @@ typedef struct
   uint8_t attempt;
   bool has_dob;
   bool applied;
+  bool optimization_pending;  // 等最终执行量反馈后结束优化窗口
+  bool optimization_finished; // 最优增益进入最终验证
 } AutotuneObject;
 
 bool AutotuneInit(AutotuneObject *tune, const AutotuneConfig *config);

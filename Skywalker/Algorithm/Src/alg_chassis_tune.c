@@ -29,7 +29,9 @@ bool ChassisTuneInit(ChassisTuneObject *tune, const ChassisTuneConfig *config)
                         .speed_limit = config->omega,
                         .position_min = -config->angle,
                         .position_max = config->angle,
-                        .response_time = config->response_time};
+                        .response_time = config->response_time,
+                        .identification = config->identification,
+                        .optimize = config->optimize};
   return AutotuneInit(&tune->yaw, &yaw);
 }
 
@@ -195,6 +197,7 @@ ChassisVelocity ChassisTuneUpdate(ChassisTuneObject *tune,
     }
     else
     {
+      AutotuneTrackOutput(&tune->yaw, executed_omega);
       tune->command.omega = AutotuneUpdate(&tune->yaw, tune->heading, omega,
                                            executed_omega, omega);
       if (tune->yaw.state == kAutotuneFailed)

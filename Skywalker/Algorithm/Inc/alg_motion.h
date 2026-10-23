@@ -46,6 +46,8 @@ void SteerSetpointReset(SteerSetpoint *setpoint, const float angle[4]);
 void SteerSetpointUpdate(SteerSetpoint *setpoint, Chassis *chassis,
                          float wheel_acceleration, float steer_rate,
                          float switch_hysteresis, float sampling_time);
+void SteerSpeedCorrect(const ChassisState *target, const float angle[4],
+                       float angle_scale, float speed[4]);
 float MotorPowerScale(const MotorPowerModel *model, const float *current,
                       const float *omega, unsigned int count, float budget);
 float MotorPowerEstimate(const MotorPowerModel *model, const float *current,

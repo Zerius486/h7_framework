@@ -17,7 +17,8 @@ bool SysidInit(SysidObject *sysid, const SysidConfig *config)
       config->window_time < config->sampling_time ||
       !isfinite(config->current_scale) || config->current_scale <= 0.0f ||
       !isfinite(config->omega_scale) || config->omega_scale <= 0.0f ||
-      !isfinite(config->memory_time) || config->memory_time < 0.0f)
+      !isfinite(config->memory_time) || config->memory_time < 0.0f ||
+      (config->method != kSysidExponential && config->method != kSysidSubspace))
   {
     return false;
   }
@@ -26,6 +27,7 @@ bool SysidInit(SysidObject *sysid, const SysidConfig *config)
   for (int i = 0; i < 4; i++)
   {
     sysid->covariance[i][i] = 10000.0f;
+    sysid->information[i][i] = 0.0001;
   }
   return true;
 }
@@ -39,6 +41,121 @@ bool SysidInit(SysidObject *sysid, const SysidConfig *config)
 static float SysidDirection(float omega, float scale)
 {
   return fminf(fmaxf(omega / (0.01f * scale), -1.0f), 1.0f);
+}
+
+/**
+ * @brief 用Cholesky分解计算四维信息矩阵的逆
+ * @param information 信息矩阵
+ * @param covariance 协方差矩阵
+ * @return 是否为有限正定矩阵
+ */
+static bool SysidInvertInformation(const double information[4][4],
+                                   double covariance[4][4])
+{
+  double lower[4][4] = {0};
+  for (int i = 0; i < 4; i++)
+  {
+    for (int j = 0; j <= i; j++)
+    {
+      double value = information[i][j];
+      for (int k = 0; k < j; k++)
+      {
+        value -= lower[i][k] * lower[j][k];
+      }
+      if (!isfinite(value) || (i == j && value <= 0.0))
+      {
+        return false;
+      }
+      lower[i][j] = i == j ? sqrt(value) : value / lower[j][j];
+    }
+  }
+  for (int column = 0; column < 4; column++)
+  {
+    double value[4] = {0};
+    for (int i = 0; i < 4; i++)
+    {
+      double sum = i == column ? 1.0 : 0.0;
+      for (int j = 0; j < i; j++)
+      {
+        sum -= lower[i][j] * value[j];
+      }
+      value[i] = sum / lower[i][i];
+    }
+    for (int i = 3; i >= 0; i--)
+    {
+      double sum = value[i];
+      for (int j = i + 1; j < 4; j++)
+      {
+        sum -= lower[j][i] * value[j];
+      }
+      value[i] = sum / lower[i][i];
+      covariance[i][column] = value[i];
+      if (!isfinite(covariance[i][column]))
+      {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * @brief 按标量观测执行SIFt-RLS，不使用通用SVD
+ * @param sysid 辨识器对象指针
+ * @param x 归一化回归向量
+ * @param error 一步预测误差
+ * @param decay 遗忘系数
+ * @return 是否更新成功
+ */
+static bool SysidSubspaceUpdate(SysidObject *sysid, const float x[4],
+                                float error, float decay)
+{
+  double rx[4] = {0};
+  double norm = 0.0;
+  double projection = 0.0;
+  for (int i = 0; i < 4; i++)
+  {
+    norm += (double)x[i] * x[i];
+    for (int j = 0; j < 4; j++)
+    {
+      rx[i] += sysid->information[i][j] * x[j];
+    }
+    projection += x[i] * rx[i];
+  }
+  if (norm < 1.0e-8 || !isfinite(projection) || projection <= 0.0)
+  {
+    return false;
+  }
+  double information[4][4];
+  double covariance[4][4];
+  for (int i = 0; i < 4; i++)
+  {
+    for (int j = 0; j < 4; j++)
+    {
+      information[i][j] = sysid->information[i][j] -
+                          (1.0 - decay) * rx[i] * rx[j] / projection +
+                          (double)x[i] * x[j];
+    }
+  }
+  if (!SysidInvertInformation(information, covariance))
+  {
+    return false;
+  }
+  for (int i = 0; i < 4; i++)
+  {
+    double gain = 0.0;
+    for (int j = 0; j < 4; j++)
+    {
+      gain += covariance[i][j] * x[j];
+    }
+    sysid->coefficient[i] += (float)(gain * error);
+    for (int j = 0; j < 4; j++)
+    {
+      sysid->covariance[i][j] = (float)covariance[i][j];
+    }
+  }
+  memcpy(sysid->information, information, sizeof(information));
+  return true;
 }
 
 /**
@@ -105,7 +222,13 @@ bool SysidUpdate(SysidObject *sysid, float current, float omega)
     denominator += x[i] * px[i];
   }
   float error = y - prediction;
-  if (fabsf(x[0]) > 0.0002f && isfinite(denominator) && denominator > 1.0e-9f)
+  bool updated = false;
+  if (config->method == kSysidSubspace)
+  {
+    updated = SysidSubspaceUpdate(sysid, x, error, decay);
+  }
+  else if (fabsf(x[0]) > 0.0002f && isfinite(denominator) &&
+           denominator > 1.0e-9f)
   {
     for (int i = 0; i < 4; i++)
     {
@@ -135,6 +258,10 @@ bool SysidUpdate(SysidObject *sysid, float current, float omega)
         sysid->covariance[i][j] *= scale[i] * scale[j];
       }
     }
+    updated = true;
+  }
+  if (updated)
+  {
     // 初始收敛窗口不参与一步预测质量统计。
     if (sysid->count >= 12U)
     {

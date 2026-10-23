@@ -48,17 +48,20 @@ cmake --build --preset Debug
 ## 算法
 
 - PID、DOB、跟踪微分器、低通、中值与陷波滤波、Kalman 和 IMU EKF。
-- 全向轮、麦轮和舵轮运动学；舵轮目标约束与三次余弦修正。
+- 全向轮、麦轮和舵轮运动学；舵轮最短选向、零速保持、协调目标约束与三次余弦轮速修正。
 - 变化率限制、五次轨迹、轮速反算和电机模型功率缩放。
 - 固定尺寸积分 RLS、单电机自动整定与慢速参数自适应。
+- 2.0 实验扩展：可选 SIFt-RLS 辨识与速度 PI 闭环性能优化。
 - 三种底盘的落地响应测试与角速度外环整定。
 - DWT 周期计数，用于测量板端实际耗时。
 
 这些模块均通过 C 接口调用。整定的激励输出、任务切换和参数保存由应用实现。
 
+完整模块清单、用途和组合关系见 [算法清单](docs/algorithms.md)。
+
 ## 文档
 
 - [框架结构](docs/framework-guide.md)
 - [应用开发](docs/manual-application.md)
+- [算法清单与组合说明](docs/algorithms.md)
 - [自动整定与辨识](docs/autotune.md)
-- [下位机算法路线与研究来源](docs/algorithm-roadmap.md)

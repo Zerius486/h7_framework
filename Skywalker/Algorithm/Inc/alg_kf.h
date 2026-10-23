@@ -54,8 +54,7 @@ typedef struct
   float *temp_zz_data;
   float *temp_x1_data;
   float *temp_z1_data;
-  uint8_t is_inited;         // 初始化标志
-  uint8_t is_data_allocated; // 保留字段
+  uint8_t is_inited; // 初始化标志
 } KfObject;
 uint32_t KfWorkspaceSize(uint8_t xhat_size, uint8_t u_size, uint8_t z_size);
 int8_t KfInit(KfObject *kf, uint8_t xhat_size, uint8_t u_size, uint8_t z_size,
