@@ -4,6 +4,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// 辨识更新方法
+typedef enum
+{
+  kSysidExponential = 0, // 指数遗忘RLS
+  kSysidSubspace,        // 信息子空间遗忘RLS
+} SysidMethod;
+
 // 积分机械模型配置结构体
 typedef struct
 {
@@ -12,6 +19,7 @@ typedef struct
   float current_scale; // 电流归一化尺度（A）
   float omega_scale;   // 角速度归一化尺度（rad/s）
   float memory_time;   // 递推记忆时间（s），0表示不遗忘
+  SysidMethod method;  // 辨识更新方法
 } SysidConfig;
 
 // 电流坐标机械模型结构体
@@ -31,6 +39,7 @@ typedef struct
   SysidConfig config;
   float coefficient[4];
   float covariance[4][4];
+  double information[4][4]; // SIFt-RLS信息矩阵，保留弱激励方向的精度
   float integral[3];
   float elapsed;
   float start_omega;

@@ -10,7 +10,7 @@ enum
   kDmForcePositionDefaultVelocityLimit = 1200, // 力位混控默认速度限制
 };
 
-// 达妙MIT模式参数范围，应与上位机电机配置保持一致。
+// J4310默认协议量程，应与电机端PMAX、VMAX、TMAX保持一致。
 static const float kDmMotorPositionMin = -12.5f;
 static const float kDmMotorPositionMax = 12.5f;
 static const float kDmMotorVelocityMin = -30.0f;
@@ -23,12 +23,26 @@ static const float kDmMotorTorqueMin = -10.0f;
 static const float kDmMotorTorqueMax = 10.0f;
 static const float kDmMotorCurrentUnitsMax = 10000.0f;
 
+// J8009P协议量程预设，可通过电机对象按实际配置调整。
+static const float kDmMotorJ8009PPositionMax = 12.5f;
+static const float kDmMotorJ8009PVelocityMax = 45.0f;
+static const float kDmMotorJ8009PTorqueMax = 54.0f;
+
 // 达妙电机类型枚举
 typedef enum
 {
   kDmMotorTypeNone = 0, // 未指定型号
   kDmMotorTypeJ4310,    // J4310系列
+  kDmMotorTypeJ8009P,   // J8009P系列
 } DmMotorType;
+
+// 达妙电机对称协议量程，与电机端配置保持一致，不代表机械限幅。
+typedef struct
+{
+  float position_max; // 位置量程绝对值（rad）
+  float velocity_max; // 速度量程绝对值（rad/s）
+  float torque_max;   // 力矩量程绝对值（Nm）
+} DmMotorLimits;
 
 // 达妙电机控制模式枚举，数值为发送CAN ID偏移量。
 typedef enum
@@ -75,12 +89,14 @@ typedef struct
 // 达妙电机对象结构体
 typedef struct
 {
-  DmMotorState state; // 电机状态
-  DmMotorType type;   // 电机类型
-  DmMotorMode mode;   // 控制模式
+  DmMotorState state;   // 电机状态
+  DmMotorType type;     // 电机类型
+  DmMotorMode mode;     // 控制模式
+  DmMotorLimits limits; // 协议量程
 } DmMotor;
 
 // API函数声明
+// 以下两个单位值换算接口仅用于J4310，MIT控制直接使用Nm。
 float DmMotorTorqueToCurrentUnits(float torque_nm);
 float DmMotorCurrentUnitsToTorque(float current_units);
 uint32_t DmMotorTxId(const DmMotor *motor);
