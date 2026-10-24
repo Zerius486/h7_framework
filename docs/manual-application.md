@@ -98,7 +98,7 @@ SteerSpeedCorrect(&chassis.state, angle, angle_scale, drive_speed);
 | IMU 与滤波 | `dev_bmi088.h`、`alg_lpf.h`、`alg_notch.h`、`alg_imu_ekf.h` |
 | 三构型运动学 | `alg_kinetics.h` |
 | 轨迹、舵轮约束/轮速修正、轮速估计及功率模型 | `alg_motion.h` |
-| 辨识、整定与PI性能优化 | `alg_sysid.h`、`alg_autotune.h`、`alg_pid_tune.h`、`alg_chassis_tune.h` |
+| 辨识、整定与PI性能优化 | `alg_sysid.h`、`alg_autotune.h`、`alg_motor_tune.h`、`alg_pid_tune.h`、`alg_chassis_tune.h` |
 | UART/CAN、流缓存 | `bsp_uart.h`、`bsp_fdcan.h`、`bsp_stream.h` |
 | 实际用时测量 | `bsp_profile.h` |
 
