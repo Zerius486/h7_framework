@@ -15,6 +15,7 @@ enum
 };
 
 // DJI电机电流值限幅（安培，SI单位制）
+// GM6020需通过RoboMaster Assistant开启电流模式。
 static const float kDjiM2006MotorCurrentLimitA = 10.0000f;
 static const float kDjiM3508MotorCurrentLimitA = 20.0000f;
 static const float kDjiGm6020MotorCurrentLimitA = 3.0000f;

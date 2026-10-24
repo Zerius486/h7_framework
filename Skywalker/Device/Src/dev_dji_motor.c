@@ -261,7 +261,7 @@ void DjiMotorCurrentCalculateWithFeedback(DjiMotor *motor,
  * @brief 按DJI指令组ID封装四路电流，未分配或未使能的通道为零
  * @param motors 电机对象指针数组
  * @param motor_count 电机数量，最多四个
- * @param tx_id 指令组CAN ID
+ * @param tx_id 指令组CAN ID，GM6020使用0x1FE/0x2FE
  * @param tx_data 八字节发送缓冲区
  */
 void DjiMotorPackCurrentGroup(DjiMotor *const motors[], uint8_t motor_count,
@@ -286,10 +286,10 @@ void DjiMotorPackCurrentGroup(DjiMotor *const motors[], uint8_t motor_count,
     uint32_t first_id;
     uint32_t last_id;
     if (motor->type == kDjiMotorGm6020 &&
-        (tx_id == 0x1FFU || tx_id == 0x2FFU))
+        (tx_id == 0x1FEU || tx_id == 0x2FEU))
     {
-      first_id = tx_id == 0x1FFU ? 0x205U : 0x209U;
-      last_id = tx_id == 0x1FFU ? 0x208U : 0x20BU;
+      first_id = tx_id == 0x1FEU ? 0x205U : 0x209U;
+      last_id = tx_id == 0x1FEU ? 0x208U : 0x20BU;
     }
     else if ((motor->type == kDjiMotorM2006 ||
               motor->type == kDjiMotorM3508) &&
