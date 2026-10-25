@@ -136,7 +136,7 @@ void RefereeRxCallback(RefereeObject *referee, uint8_t *rx_buffer,
   // 从流式缓存中按SOF和data_length拆出完整帧。
   uint16_t offset = 0;
   while ((uint16_t)(referee->rx_stream_buffer.length - offset) >=
-         kRefereeFrameMinLength)
+         kRefereeHeaderLength)
   {
     if (referee->rx_stream[offset] != kRefereeSof)
     {
@@ -145,6 +145,12 @@ void RefereeRxCallback(RefereeObject *referee, uint8_t *rx_buffer,
     }
 
     uint8_t *frame = &referee->rx_stream_buffer.buffer[offset];
+    if (!CheckCrc8(frame, kRefereeHeaderLength))
+    {
+      offset++;
+      continue;
+    }
+
     uint16_t data_length = RefereeFrameDataLength(frame);
     uint16_t frame_length = (uint16_t)(data_length + kRefereeFrameMinLength);
 
@@ -166,6 +172,8 @@ void RefereeRxCallback(RefereeObject *referee, uint8_t *rx_buffer,
     else
     {
       referee->dropped_frame_count++;
+      offset++;
+      continue;
     }
     offset = (uint16_t)(offset + frame_length);
   }

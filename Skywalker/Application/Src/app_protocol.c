@@ -57,12 +57,15 @@ void VisionProtocolRxCallback(uint8_t *rx_buffer, uint16_t rx_length)
       continue;
     }
 
-    if (CheckCrc16(&g_vision_rx_stream_buffer.buffer[offset],
-                   sizeof(VisionToGimbal)))
+    if (!CheckCrc16(&g_vision_rx_stream_buffer.buffer[offset],
+                    sizeof(VisionToGimbal)))
     {
-      memcpy(&g_vision_to_gimbal, &g_vision_rx_stream_buffer.buffer[offset],
-             sizeof(g_vision_to_gimbal));
+      offset++;
+      continue;
     }
+
+    memcpy(&g_vision_to_gimbal, &g_vision_rx_stream_buffer.buffer[offset],
+           sizeof(g_vision_to_gimbal));
     offset = (uint16_t)(offset + sizeof(VisionToGimbal));
   }
 

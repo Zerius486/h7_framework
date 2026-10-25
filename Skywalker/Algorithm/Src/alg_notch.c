@@ -35,9 +35,9 @@ void NotchFilterInit(NotchFilterObject *notch_filter, float f0, float q,
   float a0 = 1.0f + alpha;
   notch_filter->a0 = 1.0f / a0;
   notch_filter->a1 = -2.0f * cos_w0 / a0;
-  notch_filter->a2 = (1.0f - alpha) / a0;
-  notch_filter->b1 = 2.0f * cos_w0 / a0;
-  notch_filter->b2 = -(1.0f - alpha) / a0;
+  notch_filter->a2 = 1.0f / a0;
+  notch_filter->b1 = -2.0f * cos_w0 / a0;
+  notch_filter->b2 = (1.0f - alpha) / a0;
   notch_filter->x1 = 0.0f;
   notch_filter->x2 = 0.0f;
   notch_filter->y1 = 0.0f;

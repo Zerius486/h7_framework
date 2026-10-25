@@ -5,8 +5,8 @@
 /**
  * @brief 初始化非线性微分追踪器
  * @param td_nl 非线性微分追踪器结构体指针
- * @param r 速度因子
- * @param h 滤波因子
+ * @param r 跟踪加速度上限
+ * @param h 滤波时间（s），不小于采样时间
  */
 void TdNlInit(TdNlObject *td_nl, float r, float h)
 {
@@ -33,23 +33,23 @@ static float SignF(float x)
  * @brief 最速控制综合函数
  * @param x_1 误差信号
  * @param x_2 微分信号
- * @param r 速度因子
- * @param h 滤波因子
+ * @param r 跟踪加速度上限
+ * @param h 滤波时间（s）
  * @return 函数值
  */
 static float Fhan(float x_1, float x_2, float r, float h)
 {
-  float d = r * h;
+  float d = r * h * h;
   if (d == 0.0f)
   {
     return 0.0f;
   }
-  float a_0 = r * h * h;
+  float a_0 = h * x_2;
   float y = x_1 + a_0;
   float a_1 = sqrtf(d * (d + 8.0f * fabsf(y)));
   float a_2 = a_0 + SignF(y) * (a_1 - d) / 2.0f;
   float s_y = (SignF(y + d) - SignF(y - d)) / 2.0f;
-  float a = (x_2 + y - a_2) * s_y + a_2;
+  float a = (a_0 + y - a_2) * s_y + a_2;
   float s_a = (SignF(a + d) - SignF(a - d)) / 2.0f;
   float Fhan = -r * (a / d - SignF(a)) * s_a - r * SignF(a);
   return Fhan;
@@ -68,7 +68,7 @@ void TdNlUpdate(TdNlObject *td_nl, float input, float dt)
   }
   float fh = Fhan(td_nl->x1 - input, td_nl->x2, td_nl->r, td_nl->h);
   float x1_dot = td_nl->x2;
-  float x2_dot = -fh;
+  float x2_dot = fh;
   td_nl->x1 += x1_dot * dt;
   td_nl->x2 += x2_dot * dt;
 }

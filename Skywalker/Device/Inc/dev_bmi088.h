@@ -102,7 +102,7 @@ typedef struct
   float gyro_sensitivity;          // 角速度换算系数
   float accel[3];                  // m/s^2
   float gyro[3];                   // rad/s
-  float gyro_offset[3];            // rad/s
+  float gyro_offset[3];            // 传感器坐标系零偏（rad/s）
   float accel_scale;               // 加速度整体比例修正
   float g_norm;                    // 标定得到的重力模长（m/s^2）
   float temperature;               // degC
