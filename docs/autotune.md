@@ -235,22 +235,6 @@ if (MotorTuneIsActive(&motor_tune))
 
 保存模型、设计自然频率和控制参数后，可用 `AutotuneRestore()` 接入已经验证的模型及运行对象。该函数不读写 Flash，持久化由应用实现。
 
-## 底盘整体落地整定
-
-接口位于 `alg_chassis_tune.h`。支持全向、麦轮和舵轮，要求已有可用电机闭环、运动学、轮速反馈和 IMU 角速度。它测试车体响应并整定角速度外环，不替代单电机整定。
-
-`ChassisTuneConfig` 配置采样时间、平移速度、旋转速度、距离范围、角度范围和响应时间。状态由静态 `ChassisTuneObject` 保存。
-
-同样可设置 `identification = kSysidSubspace` 与 `optimize = true`，作用于车体角速度外环；三种底盘共享此流程。上一周期 `executed_omega` 同时用于辨识和执行量跟踪，内部在开始下一周期前结束待处理的优化窗口。
-
-1. `ChassisTuneInit()` 初始化，`ChassisTuneStart()` 开始测试。
-2. 活跃期间周期调用 `ChassisTuneUpdate()`，输入轮速估计的车体速度、IMU 角速度及上一周期最终下发的运动学角速度。
-3. 将返回的 `ChassisVelocity` 交给已有底盘运动学与电机闭环；所有限幅后实际采用的角速度作为下一周期 `executed_omega`。
-4. 使用 `ChassisTuneIsActive()`、`state`、`error` 判断运行结果；`ChassisTuneCancel()` 取消。
-5. 完成后从 `yaw.result` 读取角速度外环参数，从 `forward`、`lateral` 读取平移响应统计。正式控制接入与参数保存由应用实现。
-
-整车旋转模型的输入是运动学角速度指令；其 PI 输出同样是角速度指令，不能当成电机电流环增益。平移距离与响应来自轮速里程计，共同滑移无法由轮速独立识别，不能将其解释为真实地面位移标定。
-
 算法实现可独立编译和仿真；最终增益、内环近似、负载变化及结构共振仍需用对应机构的数据验证。
 
 ## 方法来源

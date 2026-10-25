@@ -2,7 +2,6 @@
 
 #include <math.h>
 
-static const float kSteerWheelSpeedEpsilon = 1e-4f;
 /**
  * @brief 将角度归一化到[-pi, pi]
  * @param angle 输入角度（rad）
