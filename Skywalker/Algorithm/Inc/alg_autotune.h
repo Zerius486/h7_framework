@@ -88,7 +88,6 @@ typedef struct
   float rotor_inertia;
   float excitation_time;
   float excitation_peak;
-  float external_difference; // 正常控制中DOB限幅丢失的电流请求（A）
   uint32_t samples;
   uint32_t random;
   uint32_t pulse_ticks;

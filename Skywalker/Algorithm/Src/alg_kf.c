@@ -14,7 +14,8 @@ uint32_t KfWorkspaceSize(uint8_t xhat_size, uint8_t u_size, uint8_t z_size)
   uint32_t x = xhat_size;
   uint32_t u = u_size > 0U ? u_size : 1U;
   uint32_t z = z_size;
-  return (2U * x + u + z + 8U * x * x + 5U * x * z + 3U * z * z + x + z);
+  return (2U * x + u + z + 8U * x * x + x * u + 5U * x * z + 3U * z * z + x +
+          z);
 }
 /**
  * @brief 设置单位矩阵

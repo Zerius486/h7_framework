@@ -19,10 +19,11 @@ typedef struct
 typedef struct
 {
   DobConfig config;            // 扰动观测器配置
-  float J_equivalent;          // 转子侧等效惯量（kg·m²）
-  float filter_decay;          // 低通滤波衰减系数
-  float filtered_current;      // 滤波后的转矩电流（A）
-  float filtered_omega;        // 滤波后的转子角速度（rad/s）
+  float J_equivalent;           // 转子侧等效惯量（kg·m²）
+  float filter_decay;           // 低通滤波衰减系数
+  float filter_derivative_gain; // 离散带限微分增益
+  float filtered_current;       // 滤波后的转矩电流（A）
+  float filtered_omega;         // 滤波后的转子角速度（rad/s）
   float estimated_disturbance; // 等效扰动力矩（N·m），正值阻碍正向旋转
   float compensation_current;  // 补偿电流（A）
   bool has_sample;             // 已接收采样标志

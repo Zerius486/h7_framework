@@ -38,6 +38,9 @@ bool DobInit(DobObject *dob, const DobConfig *config)
   dob->J_equivalent = equivalent_inertia;
   dob->filter_decay = expf(-2.0f * 3.14159265358979323846f *
                            config->filter_cutoff_hz * config->sampling_time);
+  dob->filter_derivative_gain =
+      (1.0f - dob->filter_decay) /
+      (dob->filter_decay * config->sampling_time);
   dob->is_enabled = true;
   return true;
 }
@@ -74,6 +77,7 @@ float DobUpdate(DobObject *dob, float actual_torque_current, float rotor_omega)
 
   if (!dob->has_sample)
   {
+    dob->filtered_current = actual_torque_current;
     dob->filtered_omega = rotor_omega;
     dob->has_sample = true;
     return 0.0f;
@@ -86,11 +90,9 @@ float DobUpdate(DobObject *dob, float actual_torque_current, float rotor_omega)
   dob->filtered_omega =
       alpha * dob->filtered_omega + (1.0f - alpha) * rotor_omega;
 
-  // Q(s)[Kt*i - J*s*omega]，其中Q(s)=wc/(s+wc)。
-  const float cutoff_rad_s =
-      2.0f * 3.14159265358979323846f * dob->config.filter_cutoff_hz;
+  // 归一化差分与指数低通组合，低频增益等于连续微分器。
   const float filtered_acceleration =
-      cutoff_rad_s * (rotor_omega - dob->filtered_omega);
+      dob->filter_derivative_gain * (rotor_omega - dob->filtered_omega);
   dob->estimated_disturbance =
       dob->config.torque_constant * dob->filtered_current -
       dob->J_equivalent * filtered_acceleration;

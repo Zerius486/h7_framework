@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 static const float kSqrt2 = 1.41421356237f;
+static const float kSteerWheelSpeedEpsilon = 1e-4f;
 
 // 轮序为左前、左后、右后、右前，x向前、y向左，omega逆时针为正
 // 麦轮采用X型辊子布置，轮速向前为正；全向轮正向依次为135°、-135°、-45°、45°

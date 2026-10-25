@@ -990,7 +990,8 @@ Bmi088Status Bmi088ImuCalibrate(Bmi088Object *bmi088, uint16_t sample_count,
 
     for (uint8_t i = 0; i < 3U; i++)
     {
-      gyro_sum[i] += bmi088->corrected_gyro[i];
+      // 零偏在传感器坐标系中累计，与物理量转换时的扣除一致。
+      gyro_sum[i] += bmi088->gyro[i];
       if (bmi088->corrected_gyro[i] < gyro_min[i])
       {
         gyro_min[i] = bmi088->corrected_gyro[i];
@@ -1042,7 +1043,7 @@ Bmi088Status Bmi088ImuCalibrate(Bmi088Object *bmi088, uint16_t sample_count,
 /**
  * @brief 手动设置陀螺仪零偏
  * @param bmi088 BMI088对象指针
- * @param gyro_offset 三轴陀螺仪零偏（rad/s）
+ * @param gyro_offset 传感器坐标系三轴陀螺仪零偏（rad/s）
  */
 void Bmi088SetGyroOffset(Bmi088Object *bmi088, const float gyro_offset[3])
 {

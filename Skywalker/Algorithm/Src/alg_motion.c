@@ -194,26 +194,36 @@ void SteerSetpointUpdate(SteerSetpoint *setpoint, Chassis *chassis,
     SteerCandidate(setpoint, chassis, fraction, speed_step, angle_step,
                    switch_hysteresis, &candidate);
   }
-  if (fraction < 1e-4f && fabsf(setpoint->velocity.vx) +
-                                  fabsf(setpoint->velocity.vy) +
-                                  fabsf(setpoint->velocity.omega) <
-                              1e-5f)
+  if (fraction < 1e-4f)
   {
-    // 静止时先转向，避免非零目标在零速处无法开始插值。
+    // 插值受阻时，仅预转向尚未对准的近零速轮。
     Chassis desired;
     SteerCandidate(setpoint, chassis, 1.0f, speed_step, angle_step,
                    switch_hysteresis, &desired);
-    candidate.velocity = setpoint->velocity;
+    bool is_presteering = false;
     for (int i = 0; i < 4; i++)
     {
+      if (fabsf(setpoint->wheels.wheel_speed[i]) > kSteerWheelSpeedEpsilon)
+      {
+        continue;
+      }
       float delta = remainderf(desired.state.wheel_angle[i] -
                                    setpoint->wheels.wheel_angle[i],
                                2.0f * (float)M_PI);
+      if (fabsf(delta) <= angle_step + 1e-6f)
+      {
+        continue;
+      }
+      if (!is_presteering)
+      {
+        candidate.velocity = setpoint->velocity;
+        candidate.state = setpoint->wheels;
+        is_presteering = true;
+      }
       candidate.state.wheel_angle[i] =
           remainderf(setpoint->wheels.wheel_angle[i] +
                          fminf(fmaxf(delta, -angle_step), angle_step),
                      2.0f * (float)M_PI);
-      candidate.state.wheel_speed[i] = 0.0f;
     }
   }
   setpoint->velocity = candidate.velocity;
