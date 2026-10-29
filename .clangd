@@ -1,2 +1,13 @@
+# clangd 配置。编译数据库由 CMake 导出（CMakeLists.txt 中的
+# CMAKE_EXPORT_COMPILE_COMMANDS），路径须与 CMakePresets.json 的
+# binaryDir 一致，不一致时索引会静默失效。
 CompileFlags:
   CompilationDatabase: build/Debug
+
+# include-cleaner 只认可“在直接包含的头文件中声明”的符号。本工程采用
+# stm32h7xx_hal.h -> stm32h7xx.h -> core_cm7.h 的分级包含，DWT、CoreDebug
+# 等 CMSIS 符号会被判为“未使用”；按提示删除会因符号未声明而编译失败，
+# 改为包含 stm32h7xx.h 同样误报，直接包含 core_cm7.h 则缺少 __FPU_PRESENT。
+# 因此关闭该类提示，MissingIncludes（漏包含）保持开启。
+Diagnostics:
+  UnusedIncludes: None
