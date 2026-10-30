@@ -1,4 +1,4 @@
-# H7 Framework
+# H7 Framework 工程
 
 H7 Framework 是一套面向 RoboMaster 的 STM32H723 固件工程。工程包含 STM32 HAL、FreeRTOS 和 CMSIS-DSP；`Skywalker/` 中的代码负责外设封装、设备驱动、控制算法及机器人应用接口。
 
