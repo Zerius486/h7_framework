@@ -25,11 +25,8 @@ set(CMAKE_PROJECT_NAME h7_framework)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 # Core project settings
-project(${CMAKE_PROJECT_NAME})
+project(${CMAKE_PROJECT_NAME} LANGUAGES C ASM)
 message("Build type: " ${CMAKE_BUILD_TYPE})
-
-# Enable CMake support for ASM and C languages
-enable_language(C ASM)
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
@@ -43,7 +40,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 # Collect Skywalker sources
-file(GLOB_RECURSE SKYWALKER_SOURCES
+file(GLOB_RECURSE SKYWALKER_SOURCES CONFIGURE_DEPENDS
     "Skywalker/BSP/Src/*.c"
     "Skywalker/Algorithm/Src/*.c"
     "Skywalker/Device/Src/*.c"

@@ -6,6 +6,13 @@
 #define MOTOR_TUNE_MAX_CANDIDATES 27U
 #define MOTOR_TUNE_HOLD_POINTS 3U
 
+#define MOTOR_TUNE_OBJECTIVE_ERROR (1U << 0)
+#define MOTOR_TUNE_OBJECTIVE_OVERSHOOT (1U << 1)
+#define MOTOR_TUNE_OBJECTIVE_SETTLING (1U << 2)
+#define MOTOR_TUNE_OBJECTIVE_RIPPLE (1U << 3)
+#define MOTOR_TUNE_OBJECTIVE_SLEW (1U << 4)
+#define MOTOR_TUNE_OBJECTIVE_SATURATION (1U << 5)
+
 // 单电机性能整定状态
 typedef enum
 {
@@ -42,12 +49,12 @@ typedef enum
   kMotorTuneVerified
 } MotorTuneCandidateState;
 
-// 等间隔物理参数搜索范围
+// 物理参数搜索范围
 typedef struct
 {
   float lower;
   float upper;
-  uint8_t count; // 1至3，单点时上下限相同
+  uint8_t count; // 1至3，1表示固定，乘积作为默认测试预算
 } MotorTuneRange;
 
 // 实测性能结构体
@@ -81,10 +88,14 @@ typedef struct
   MotorTuneRange damping;     // 阻尼比
   MotorTuneRange feedforward; // 加速度前馈比例，0至1.5
   MotorTuneLimits limits;
-  float speed_amplitude;    // 速度测试最大目标（rad/s）
-  float position_amplitude; // 位置测试幅度（rad），速度模式不使用
-  float segment_time;       // 单个运动/保持段时长（s）
-  float settling_band;      // 稳定带相对测试幅度的比例，0至0.5
+  float speed_amplitude;                // 速度测试最大目标（rad/s）
+  float position_amplitude;             // 位置测试幅度（rad），速度模式不使用
+  float segment_time;                   // 单个运动/保持段时长（s）
+  float settling_band;                  // 稳定带相对测试幅度的比例，0至0.5
+  MotorTuneLimits comparison_tolerance; // 指标比较容差，单位与对应指标一致
+  uint8_t objectives;         // 帕累托目标位掩码，0使用误差和电流变化率
+  uint8_t search_budget;      // 候选预算，0使用三个count的乘积，上限27
+  uint8_t validation_repeats; // 独立验证次数，0使用2次，上限3
 } MotorTuneConfig;
 
 // 保持位置与实测电流
@@ -125,6 +136,7 @@ typedef struct
   MotorTuneMetrics training;
   MotorTuneMetrics validation;
   MotorTuneCandidateState state;
+  uint8_t validation_runs;
 } MotorTuneCandidate;
 
 // 有限测试集中的帕累托结果
@@ -178,6 +190,7 @@ typedef struct
   uint32_t limited_samples;
   uint8_t segment;
   uint8_t candidate_index;
+  uint8_t search_round;
   bool position_test;
   bool pending;
   bool tracked;

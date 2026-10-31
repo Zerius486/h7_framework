@@ -1,0 +1,11 @@
+{
+  "motor": "M2006",
+  "run_id": "bench-20261027-001",
+  "board": "single",
+  "firmware_revision": "local",
+  "controller": "speed_pid",
+  "sampling_time_s": 0.002,
+  "test_stage": "autotune",
+  "position_min_rad": -10.0,
+  "position_max_rad": 10.0
+}

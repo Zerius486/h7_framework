@@ -34,20 +34,6 @@ static bool MotorTuneRangeValid(const MotorTuneRange *range, float lower,
 }
 
 /**
- * @brief 读取等间隔搜索点
- * @param range 搜索范围指针
- * @param index 点下标
- * @return 参数值
- */
-static float MotorTuneRangeValue(const MotorTuneRange *range, uint8_t index)
-{
-  return range->count == 1U
-             ? range->lower
-             : range->lower + (range->upper - range->lower) * (float)index /
-                                  (float)(range->count - 1U);
-}
-
-/**
  * @brief 判断整定是否正在接管输出
  * @param tune 整定对象指针
  * @return 是否处于测试阶段
@@ -98,15 +84,26 @@ bool MotorTuneInit(MotorTuneObject *tune, const MotorTuneConfig *config)
       config->segment_time > 10.0f ||
       config->segment_time < 20.0f * config->plant.sampling_time ||
       !isfinite(config->settling_band) || config->settling_band <= 0.0f ||
-      config->settling_band >= 0.5f || config->plant.speed_offset != 0.0f)
+      config->settling_band >= 0.5f || config->plant.speed_offset != 0.0f ||
+      config->objectives > 63U ||
+      config->search_budget > MOTOR_TUNE_MAX_CANDIDATES ||
+      config->validation_repeats > 3U)
   {
     return false;
   }
-  const float limits[] = {
-      config->limits.rms_error,     config->limits.overshoot,
-      config->limits.settling_time, config->limits.idle_ripple,
-      config->limits.rms_slew,      config->limits.saturation};
-  for (uint8_t i = 0U; i < 6U; i++)
+  const float limits[] = {config->limits.rms_error,
+                          config->limits.overshoot,
+                          config->limits.settling_time,
+                          config->limits.idle_ripple,
+                          config->limits.rms_slew,
+                          config->limits.saturation,
+                          config->comparison_tolerance.rms_error,
+                          config->comparison_tolerance.overshoot,
+                          config->comparison_tolerance.settling_time,
+                          config->comparison_tolerance.idle_ripple,
+                          config->comparison_tolerance.rms_slew,
+                          config->comparison_tolerance.saturation};
+  for (uint8_t i = 0U; i < 12U; i++)
   {
     if (!isfinite(limits[i]) || limits[i] < 0.0f)
     {
@@ -126,6 +123,21 @@ bool MotorTuneInit(MotorTuneObject *tune, const MotorTuneConfig *config)
     return false;
   }
   tune->config = *config;
+  if (tune->config.objectives == 0U)
+  {
+    tune->config.objectives =
+        MOTOR_TUNE_OBJECTIVE_ERROR | MOTOR_TUNE_OBJECTIVE_SLEW;
+  }
+  if (tune->config.search_budget == 0U)
+  {
+    tune->config.search_budget = config->bandwidth.count *
+                                 config->damping.count *
+                                 config->feedforward.count;
+  }
+  if (tune->config.validation_repeats == 0U)
+  {
+    tune->config.validation_repeats = 2U;
+  }
   tune->segment_ticks =
       (uint32_t)ceilf(config->segment_time / config->plant.sampling_time);
   tune->initialized = true;
@@ -221,25 +233,61 @@ static void MotorTuneDesign(const MotorTuneObject *tune,
 }
 
 /**
- * @brief 枚举有限物理参数网格
+ * @brief 加入范围内尚未测试的候选
+ * @param tune 整定对象指针
+ * @param value 自然频率、阻尼和前馈比例
+ * @return 是否加入
+ */
+static bool MotorTuneAdd(MotorTuneObject *tune, const float value[3])
+{
+  if (tune->result.candidate_count >= tune->config.search_budget)
+  {
+    return false;
+  }
+  for (uint8_t i = 0U; i < tune->result.candidate_count; i++)
+  {
+    const MotorTuneCandidate *c = &tune->result.candidate[i];
+    if (fabsf(c->bandwidth - value[0]) <= 1.0e-5f * fmaxf(1.0f, value[0]) &&
+        fabsf(c->damping - value[1]) <= 1.0e-5f &&
+        fabsf(c->feedforward - value[2]) <= 1.0e-5f)
+    {
+      return false;
+    }
+  }
+  MotorTuneCandidate *c =
+      &tune->result.candidate[tune->result.candidate_count++];
+  *c = (MotorTuneCandidate){
+      .bandwidth = value[0], .damping = value[1], .feedforward = value[2]};
+  MotorTuneDesign(tune, c);
+  return true;
+}
+
+/**
+ * @brief 生成中心和单轴边界初始候选
  * @param tune 整定对象指针
  */
 static void MotorTuneCandidates(MotorTuneObject *tune)
 {
-  for (uint8_t i = 0U; i < tune->config.bandwidth.count; i++)
+  const MotorTuneRange *range[3] = {&tune->config.bandwidth,
+                                    &tune->config.damping,
+                                    &tune->config.feedforward};
+  float center[3];
+  for (uint8_t d = 0U; d < 3U; d++)
   {
-    for (uint8_t j = 0U; j < tune->config.damping.count; j++)
+    center[d] = 0.5f * (range[d]->lower + range[d]->upper);
+  }
+  (void)MotorTuneAdd(tune, center);
+  for (uint8_t d = 0U; d < 3U; d++)
+  {
+    if (range[d]->count == 1U)
     {
-      for (uint8_t k = 0U; k < tune->config.feedforward.count; k++)
-      {
-        MotorTuneCandidate *candidate =
-            &tune->result.candidate[tune->result.candidate_count++];
-        candidate->bandwidth = MotorTuneRangeValue(&tune->config.bandwidth, i);
-        candidate->damping = MotorTuneRangeValue(&tune->config.damping, j);
-        candidate->feedforward =
-            MotorTuneRangeValue(&tune->config.feedforward, k);
-        MotorTuneDesign(tune, candidate);
-      }
+      continue;
+    }
+    for (uint8_t side = 0U; side < 2U; side++)
+    {
+      float value[3] = {center[0], center[1], center[2]};
+      value[d] = side == 0U ? range[d]->lower : range[d]->upper;
+      (void)MotorTuneAdd(tune, value);
     }
   }
 }
@@ -375,21 +423,126 @@ static bool MotorTuneFeasible(const MotorTuneObject *tune)
 
 /**
  * @brief 比较两组性能的帕累托支配关系
+ * @param tune 整定对象指针
  * @param a 第一组性能
  * @param b 第二组性能
  * @return 第一组是否支配第二组
  */
-static bool MotorTuneDominates(const MotorTuneMetrics *a,
+static bool MotorTuneDominates(const MotorTuneObject *tune,
+                               const MotorTuneMetrics *a,
                                const MotorTuneMetrics *b)
 {
-  return a->rms_error <= b->rms_error && a->overshoot <= b->overshoot &&
-         a->settling_time <= b->settling_time &&
-         a->idle_ripple <= b->idle_ripple && a->rms_slew <= b->rms_slew &&
-         a->saturation <= b->saturation &&
-         (a->rms_error < b->rms_error || a->overshoot < b->overshoot ||
-          a->settling_time < b->settling_time ||
-          a->idle_ripple < b->idle_ripple || a->rms_slew < b->rms_slew ||
-          a->saturation < b->saturation);
+  const MotorTuneLimits *t = &tune->config.comparison_tolerance;
+  const float av[6] = {a->rms_error,   a->overshoot, a->settling_time,
+                       a->idle_ripple, a->rms_slew,  a->saturation};
+  const float bv[6] = {b->rms_error,   b->overshoot, b->settling_time,
+                       b->idle_ripple, b->rms_slew,  b->saturation};
+  const float tolerance[6] = {t->rms_error,   t->overshoot, t->settling_time,
+                              t->idle_ripple, t->rms_slew,  t->saturation};
+  bool better = false;
+  for (uint8_t i = 0U; i < 6U; i++)
+  {
+    if ((tune->config.objectives & (1U << i)) == 0U)
+    {
+      continue;
+    }
+    if (av[i] > bv[i])
+    {
+      return false;
+    }
+    better = better || av[i] + tolerance[i] < bv[i];
+  }
+  return better;
+}
+
+/**
+ * @brief 优先细化已验证前沿，无可行点时围绕约束违背最小的候选探索
+ * @param tune 整定对象指针
+ * @return 是否加入下一批候选
+ */
+static bool MotorTuneRefine(MotorTuneObject *tune)
+{
+  if (tune->result.candidate_count >= tune->config.search_budget ||
+      tune->search_round >= 4U)
+  {
+    return false;
+  }
+  uint8_t count = tune->result.candidate_count;
+  uint8_t best = 0U;
+  float violation = INFINITY;
+  const MotorTuneLimits *l = &tune->config.limits;
+  const float limits[6] = {l->rms_error,   l->overshoot, l->settling_time,
+                           l->idle_ripple, l->rms_slew,  l->saturation};
+  for (uint8_t i = 0U; i < count; i++)
+  {
+    const MotorTuneCandidate *c = &tune->result.candidate[i];
+    if (c->state == kMotorTuneInvalidDesign)
+    {
+      continue;
+    }
+    const MotorTuneMetrics *m =
+        c->validation_runs > 0U ? &c->validation : &c->training;
+    const float values[6] = {m->rms_error,   m->overshoot, m->settling_time,
+                             m->idle_ripple, m->rms_slew,  m->saturation};
+    float score = m->settled ? 0.0f : 1.0f;
+    for (uint8_t j = 0U; j < 6U; j++)
+    {
+      if (limits[j] > 0.0f)
+      {
+        score += fmaxf(values[j] / limits[j] - 1.0f, 0.0f);
+      }
+    }
+    if (score < violation)
+    {
+      violation = score;
+      best = i;
+    }
+  }
+  if (!isfinite(violation))
+  {
+    return false;
+  }
+  const MotorTuneRange *range[3] = {&tune->config.bandwidth,
+                                    &tune->config.damping,
+                                    &tune->config.feedforward};
+  float fraction = 0.25f / (float)(1U << tune->search_round++);
+  bool added = false;
+  for (uint8_t i = 0U; i < count; i++)
+  {
+    const MotorTuneCandidate *anchor = &tune->result.candidate[i];
+    bool selected = anchor->state == kMotorTuneVerified;
+    for (uint8_t j = 0U; selected && j < count; j++)
+    {
+      if (tune->result.candidate[j].state == kMotorTuneVerified &&
+          MotorTuneDominates(tune, &tune->result.candidate[j].validation,
+                             &anchor->validation))
+      {
+        selected = false;
+      }
+    }
+    if ((!selected && (tune->result.verified_count > 0U || i != best)))
+    {
+      continue;
+    }
+    float center[3] = {anchor->bandwidth, anchor->damping, anchor->feedforward};
+    for (uint8_t d = 0U; d < 3U; d++)
+    {
+      if (range[d]->count == 1U)
+      {
+        continue;
+      }
+      for (uint8_t side = 0U; side < 2U; side++)
+      {
+        float value[3] = {center[0], center[1], center[2]};
+        value[d] =
+            MotorTuneClamp(center[d] + (side == 0U ? -1.0f : 1.0f) * fraction *
+                                           (range[d]->upper - range[d]->lower),
+                           range[d]->lower, range[d]->upper);
+        added = MotorTuneAdd(tune, value) || added;
+      }
+    }
+  }
+  return added;
 }
 
 /**
@@ -409,7 +562,7 @@ static void MotorTunePareto(MotorTuneObject *tune)
     for (uint8_t j = 0U; j < tune->result.candidate_count; j++)
     {
       if (tune->result.candidate[j].state == kMotorTuneVerified &&
-          MotorTuneDominates(&tune->result.candidate[j].validation,
+          MotorTuneDominates(tune, &tune->result.candidate[j].validation,
                              &tune->result.candidate[i].validation))
       {
         dominated = true;
@@ -449,7 +602,12 @@ static void MotorTuneNext(MotorTuneObject *tune, float position, float omega,
   }
   if (tune->candidate_index == tune->result.candidate_count)
   {
-    MotorTunePareto(tune);
+    if (!MotorTuneRefine(tune))
+    {
+      MotorTunePareto(tune);
+      return;
+    }
+    MotorTuneNext(tune, position, omega, current);
     return;
   }
   MotorTunePrepare(tune, kMotorTuneSearch, position, omega, current);
@@ -641,7 +799,21 @@ static void MotorTuneFinish(MotorTuneObject *tune, float position, float omega,
   }
   else
   {
-    candidate->validation = tune->metrics;
+    MotorTuneMetrics *m = &candidate->validation;
+    m->rms_error = fmaxf(m->rms_error, tune->metrics.rms_error);
+    m->overshoot = fmaxf(m->overshoot, tune->metrics.overshoot);
+    m->settling_time = fmaxf(m->settling_time, tune->metrics.settling_time);
+    m->idle_ripple = fmaxf(m->idle_ripple, tune->metrics.idle_ripple);
+    m->rms_slew = fmaxf(m->rms_slew, tune->metrics.rms_slew);
+    m->saturation = fmaxf(m->saturation, tune->metrics.saturation);
+    m->settled = feasible;
+    candidate->validation_runs++;
+    if (feasible &&
+        candidate->validation_runs < tune->config.validation_repeats)
+    {
+      MotorTunePrepare(tune, kMotorTuneValidate, position, omega, current);
+      return;
+    }
     candidate->state =
         feasible ? kMotorTuneVerified : kMotorTuneValidationRejected;
     if (feasible)
@@ -854,7 +1026,7 @@ bool MotorTuneTrackOutput(MotorTuneObject *tune, float executed_current)
 }
 
 /**
- * @brief 导出已独立验证的帕累托候选控制器配置
+ * @brief 导出通过轨迹验证的帕累托候选控制器配置
  * @param tune 整定对象指针
  * @param pareto_index 帕累托集合下标
  * @param speed 速度控制器配置输出指针
