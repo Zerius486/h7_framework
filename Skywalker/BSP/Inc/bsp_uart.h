@@ -1,6 +1,8 @@
 #ifndef BSP_UART_H
 #define BSP_UART_H
 
+#include <stdbool.h>
+
 #include "stm32h7xx_hal.h"
 
 // UART缓冲区大小和外设数量
@@ -31,5 +33,8 @@ uint8_t UartIndex(UART_HandleTypeDef *huart);
 void UartInit(UART_HandleTypeDef *huart, UartRxCallback callback);
 void UartTransmit(UART_HandleTypeDef *huart, uint8_t *tx_data,
                   uint16_t tx_length);
+bool UartTransmitTry(UART_HandleTypeDef *huart, uint8_t *tx_data,
+                     uint16_t tx_length);
+bool UartTransmitReady(UART_HandleTypeDef *huart);
 
 #endif // BSP_UART_H

@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "alg_kinetics.h"
+#include "bsp_debug_log.h"
 #include "stm32h7xx_hal.h"
 
 // 板卡角色枚举
@@ -35,8 +36,8 @@ typedef struct
 {
   AppBoardRole board_role;         // 本板角色
   AppControlSource chassis_source; // 底盘默认控制来源
-  AppControlSource gimbal_source;   // 云台默认控制来源
-  AppControlSource shoot_source;    // 发射默认控制来源
+  AppControlSource gimbal_source;  // 云台默认控制来源
+  AppControlSource shoot_source;   // 发射默认控制来源
 } AppRobotConfig;
 
 // 任务周期配置结构体
@@ -63,11 +64,11 @@ typedef struct
 typedef struct
 {
   FDCAN_HandleTypeDef *hfdcan; // 电机CAN
-  uint32_t tx_id;             // 指令CAN ID，组帧电机填写组ID
-  uint32_t rx_id;             // 反馈CAN ID
-  float reduction_ratio;      // 电机转速与输出轴转速之比
-  float zero_angle;           // 输出轴零位对应的电机角度（rad）
-  float direction;            // 电机正向与机构正向的关系，取1或-1
+  uint32_t tx_id;              // 指令CAN ID，组帧电机填写组ID
+  uint32_t rx_id;              // 反馈CAN ID
+  float reduction_ratio;       // 电机转速与输出轴转速之比
+  float zero_angle;            // 输出轴零位对应的电机角度（rad）
+  float direction;             // 电机正向与机构正向的关系，取1或-1
 } AppMotorConfig;
 
 // 底盘机械配置结构体
@@ -75,9 +76,9 @@ typedef struct
 {
   ChassisType type;     // 底盘类型
   ChassisParams params; // 底盘半轮距（m）
-  float wheel_radius;  // 驱动轮半径（m）
-  float max_speed;     // 底盘平移速度上限（m/s）
-  float max_omega;     // 底盘旋转角速度上限（rad/s）
+  float wheel_radius;   // 驱动轮半径（m）
+  float max_speed;      // 底盘平移速度上限（m/s）
+  float max_omega;      // 底盘旋转角速度上限（rad/s）
 } AppChassisConfig;
 
 // 云台配置结构体，角度相对机构零位
@@ -104,6 +105,7 @@ extern const AppCommunicationConfig g_app_communication_config;
 extern const AppChassisConfig g_app_chassis_config;
 extern const AppGimbalConfig g_app_gimbal_config;
 extern const AppShootConfig g_app_shoot_config;
+extern const DebugLogConfig g_app_debug_log_config;
 
 void AppConfigInit(void);
 

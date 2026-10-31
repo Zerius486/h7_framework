@@ -1,0 +1,944 @@
+{
+  "format_version": 1,
+  "date": "2026-10-27",
+  "scope": "archived samples only; no new hardware run",
+  "offline_config": {
+    "sampling_time_s": 0.002,
+    "minimum_speed_rad_s": 0.16,
+    "training_fraction": 0.65,
+    "windows_s": [
+      0.01,
+      0.02,
+      0.04
+    ],
+    "delays_samples": [
+      0,
+      2
+    ]
+  },
+  "firmware_config": {
+    "sampling_time_s": 0.002,
+    "window_s": 0.02,
+    "minimum_speed_rad_s": 0.16,
+    "omega_scale": 8.0,
+    "current_scale": {
+      "M2006": 1.0,
+      "GM6020": 0.2
+    }
+  },
+  "limitations": [
+    "Offline LS and firmware weighted RLS use different fitting objectives and fitness denominators.",
+    "Archived records have no independent external reference; IV and closed-loop FRF are unavailable.",
+    "No complete measured candidate table or independent final confirmation is available to compare search strategies.",
+    "Firmware replay reports original sliding-window model checks, not the new staged hardware excitation and subsequent frozen-model prediction."
+  ],
+  "implementation_sha256": {
+    "tools/tuning/records.py": "a04d7d945048855d0f18ff0aace80b700839a196b6248af9868300b10d627080",
+    "Skywalker/Algorithm/Src/alg_sysid.c": "b4827766576c8bbada127672c92d09462c89cad6f47cb1e8633953f86cc21b31"
+  },
+  "records": [
+    {
+      "comparisons": [
+        {
+          "window_s": 0.01,
+          "delay_samples": 0,
+          "training_windows": 285,
+          "validation_windows": 185,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 1.8263461472566965e-06,
+              "B": 0.0,
+              "F": 0.04517427024248342,
+              "L": -0.0025196251424179413
+            },
+            "physical": true,
+            "current_fitness": 0.7799219912985798,
+            "velocity": {
+              "rmse": 550.5564591214446,
+              "fitness": -50991.080762319514,
+              "samples": 1045,
+              "segments": 34,
+              "accepted": false
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.01,
+          "delay_samples": 2,
+          "training_windows": 290,
+          "validation_windows": 181,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 3.144859078067831e-05,
+              "B": 0.0,
+              "F": 0.04600562856155068,
+              "L": -0.00220455252516493
+            },
+            "physical": true,
+            "current_fitness": 0.8351090128538932,
+            "velocity": {
+              "rmse": 30.32613296924208,
+              "fitness": -153.71523432663614,
+              "samples": 1045,
+              "segments": 34,
+              "accepted": false
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.02,
+          "delay_samples": 0,
+          "training_windows": 118,
+          "validation_windows": 77,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": -3.905796777348106e-05,
+              "B": 0.0,
+              "F": 0.0440952339135794,
+              "L": -0.0034178510910199225
+            },
+            "physical": false,
+            "current_fitness": 0.8485958711820206,
+            "velocity": {
+              "accepted": false,
+              "reason": "nonpositive inertia"
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.02,
+          "delay_samples": 2,
+          "training_windows": 118,
+          "validation_windows": 77,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 2.541556641507561e-05,
+              "B": 0.0,
+              "F": 0.04563250478518663,
+              "L": -0.0027877314301038123
+            },
+            "physical": true,
+            "current_fitness": 0.8565689086099615,
+            "velocity": {
+              "rmse": 37.77499307141108,
+              "fitness": -239.05336402511043,
+              "samples": 1045,
+              "segments": 34,
+              "accepted": false
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.04,
+          "delay_samples": 0,
+          "training_windows": 34,
+          "validation_windows": 25,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": -7.288343927164076e-05,
+              "B": 0.0,
+              "F": 0.0441347748147877,
+              "L": -0.004837034715928513
+            },
+            "physical": false,
+            "current_fitness": 0.8545145597433776,
+            "velocity": {
+              "accepted": false,
+              "reason": "nonpositive inertia"
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.04,
+          "delay_samples": 2,
+          "training_windows": 35,
+          "validation_windows": 25,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": -1.2087965556901294e-05,
+              "B": 0.0,
+              "F": 0.04472835442677813,
+              "L": -0.004885320829771385
+            },
+            "physical": false,
+            "current_fitness": 0.859217099685698,
+            "velocity": {
+              "accepted": false,
+              "reason": "nonpositive inertia"
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        }
+      ],
+      "record": {
+        "name": "gm6020_20261026_1523.bin",
+        "sha256": "25656bf3daf8bf829dbec5d6ba3ec904eb95877385514e81b8471e45d8c74d1a",
+        "rows": 6000
+      },
+      "firmware_replay": [
+        {
+          "method": "exponential_rls",
+          "delay_samples": 0,
+          "accepted": false,
+          "M": -2.141623554052785e-05,
+          "B": 0.0,
+          "F": 0.046593714505434036,
+          "fitness": 0.8812315464019775,
+          "validation_fitness": 0.8814423680305481,
+          "windows": 195,
+          "rejected_windows": 404,
+          "status": 2
+        },
+        {
+          "method": "exponential_rls",
+          "delay_samples": 2,
+          "accepted": false,
+          "M": 3.391502468730323e-05,
+          "B": 0.0,
+          "F": 0.04748457297682762,
+          "fitness": 0.8811324834823608,
+          "validation_fitness": 0.8881068825721741,
+          "windows": 195,
+          "rejected_windows": 404,
+          "status": 2
+        },
+        {
+          "method": "sift_rls",
+          "delay_samples": 0,
+          "accepted": false,
+          "M": -2.1412308342405595e-05,
+          "B": 0.0,
+          "F": 0.046595290303230286,
+          "fitness": 0.8812315464019775,
+          "validation_fitness": 0.8814423680305481,
+          "windows": 195,
+          "rejected_windows": 404,
+          "status": 2
+        },
+        {
+          "method": "sift_rls",
+          "delay_samples": 2,
+          "accepted": false,
+          "M": 3.392037979210727e-05,
+          "B": 0.0,
+          "F": 0.04748653993010521,
+          "fitness": 0.8811324834823608,
+          "validation_fitness": 0.8881068825721741,
+          "windows": 195,
+          "rejected_windows": 404,
+          "status": 2
+        }
+      ]
+    },
+    {
+      "comparisons": [
+        {
+          "window_s": 0.01,
+          "delay_samples": 0,
+          "training_windows": 286,
+          "validation_windows": 170,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": -1.2579361795834475e-05,
+              "B": 0.0,
+              "F": 0.054997602647562024,
+              "L": 0.003099741902336541
+            },
+            "physical": false,
+            "current_fitness": 0.7947494936810983,
+            "velocity": {
+              "accepted": false,
+              "reason": "nonpositive inertia"
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.01,
+          "delay_samples": 2,
+          "training_windows": 284,
+          "validation_windows": 168,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 9.562114747314252e-07,
+              "B": 0.0,
+              "F": 0.05657550252563454,
+              "L": 0.002005306970448714
+            },
+            "physical": true,
+            "current_fitness": 0.8224719599289443,
+            "velocity": {
+              "rmse": 332.2292438544397,
+              "fitness": -27470.93659299681,
+              "samples": 966,
+              "segments": 36,
+              "accepted": false
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.02,
+          "delay_samples": 0,
+          "training_windows": 121,
+          "validation_windows": 70,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": -5.4459127074434276e-05,
+              "B": 0.0,
+              "F": 0.055176064983955206,
+              "L": 0.0030841926463824965
+            },
+            "physical": false,
+            "current_fitness": 0.8270886857485453,
+            "velocity": {
+              "accepted": false,
+              "reason": "nonpositive inertia"
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.02,
+          "delay_samples": 2,
+          "training_windows": 119,
+          "validation_windows": 70,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": -3.7849801305327447e-06,
+              "B": 0.0,
+              "F": 0.05628988837283298,
+              "L": 0.002748745042052766
+            },
+            "physical": false,
+            "current_fitness": 0.8517508879925697,
+            "velocity": {
+              "accepted": false,
+              "reason": "nonpositive inertia"
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.04,
+          "delay_samples": 0,
+          "training_windows": 39,
+          "validation_windows": 24,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": -3.3257824994770288e-06,
+              "B": 0.0,
+              "F": 0.05778649070724901,
+              "L": 0.004480579107546646
+            },
+            "physical": false,
+            "current_fitness": 0.8107613294369479,
+            "velocity": {
+              "accepted": false,
+              "reason": "nonpositive inertia"
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.04,
+          "delay_samples": 2,
+          "training_windows": 39,
+          "validation_windows": 23,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 1.7901912971652478e-05,
+              "B": 0.0,
+              "F": 0.05813203595485049,
+              "L": 0.004350744480269836
+            },
+            "physical": true,
+            "current_fitness": 0.8594541119178225,
+            "velocity": {
+              "rmse": 17.246922970775934,
+              "fitness": -73.03495339419027,
+              "samples": 966,
+              "segments": 36,
+              "accepted": false
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        }
+      ],
+      "record": {
+        "name": "gm6020_20261026_1539.bin",
+        "sha256": "ae0fd22e6a0c7e8ab9a72229400bc1102866ca4ffa36d45f4c5766ccae660c61",
+        "rows": 6000
+      },
+      "firmware_replay": [
+        {
+          "method": "exponential_rls",
+          "delay_samples": 0,
+          "accepted": false,
+          "M": -4.235531741869636e-05,
+          "B": 0.0,
+          "F": 0.052010685205459595,
+          "fitness": 0.9186623096466064,
+          "validation_fitness": 0.9550588726997375,
+          "windows": 191,
+          "rejected_windows": 408,
+          "status": 2
+        },
+        {
+          "method": "exponential_rls",
+          "delay_samples": 2,
+          "accepted": false,
+          "M": 1.7863365428638645e-05,
+          "B": 0.0,
+          "F": 0.053436797112226486,
+          "fitness": 0.927140474319458,
+          "validation_fitness": 0.9532265067100525,
+          "windows": 189,
+          "rejected_windows": 410,
+          "status": 2
+        },
+        {
+          "method": "sift_rls",
+          "delay_samples": 0,
+          "accepted": false,
+          "M": -4.2356161429779604e-05,
+          "B": 0.0,
+          "F": 0.05201081186532974,
+          "fitness": 0.9186623096466064,
+          "validation_fitness": 0.9550588726997375,
+          "windows": 191,
+          "rejected_windows": 408,
+          "status": 2
+        },
+        {
+          "method": "sift_rls",
+          "delay_samples": 2,
+          "accepted": false,
+          "M": 1.7863436369225383e-05,
+          "B": 0.0,
+          "F": 0.05343678221106529,
+          "fitness": 0.927140474319458,
+          "validation_fitness": 0.9532265067100525,
+          "windows": 189,
+          "rejected_windows": 410,
+          "status": 2
+        }
+      ]
+    },
+    {
+      "comparisons": [
+        {
+          "window_s": 0.01,
+          "delay_samples": 0,
+          "training_windows": 428,
+          "validation_windows": 303,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.0033953273839477504,
+              "B": 0.0030436040864868464,
+              "F": 0.0684449395676907,
+              "L": -0.0011068123027164092
+            },
+            "physical": true,
+            "current_fitness": 0.7521292198907065,
+            "velocity": {
+              "rmse": 0.36025113331901987,
+              "fitness": 0.8651654196185339,
+              "samples": 1597,
+              "segments": 32,
+              "accepted": true
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.01,
+          "delay_samples": 2,
+          "training_windows": 424,
+          "validation_windows": 304,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.0032891809202714693,
+              "B": 0.004460872726795639,
+              "F": 0.07214432181515311,
+              "L": -0.0017788922606205221
+            },
+            "physical": true,
+            "current_fitness": 0.7944360444111123,
+            "velocity": {
+              "rmse": 0.3956552421512612,
+              "fitness": 0.8373611013049507,
+              "samples": 1597,
+              "segments": 32,
+              "accepted": true
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.02,
+          "delay_samples": 0,
+          "training_windows": 202,
+          "validation_windows": 144,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.004457726736502457,
+              "B": 0.003486067070209487,
+              "F": 0.06827130401010865,
+              "L": -0.00027155843909002983
+            },
+            "physical": true,
+            "current_fitness": 0.9012078353529659,
+            "velocity": {
+              "rmse": 0.17930427489369918,
+              "fitness": 0.9665980467131756,
+              "samples": 1597,
+              "segments": 32,
+              "accepted": true
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.02,
+          "delay_samples": 2,
+          "training_windows": 200,
+          "validation_windows": 145,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.004340316917329079,
+              "B": 0.0034847741159816773,
+              "F": 0.07362433466813313,
+              "L": -0.001679056669282168
+            },
+            "physical": true,
+            "current_fitness": 0.9245339182414171,
+            "velocity": {
+              "rmse": 0.22993935171124402,
+              "fitness": 0.9450690409398138,
+              "samples": 1597,
+              "segments": 32,
+              "accepted": true
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.04,
+          "delay_samples": 0,
+          "training_windows": 86,
+          "validation_windows": 64,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.004677003688655388,
+              "B": 0.004136202988198464,
+              "F": 0.06632026839587128,
+              "L": 0.0002234320369446461
+            },
+            "physical": true,
+            "current_fitness": 0.9707738116694649,
+            "velocity": {
+              "rmse": 0.16916919335233208,
+              "fitness": 0.9702673832164025,
+              "samples": 1597,
+              "segments": 32,
+              "accepted": true
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.04,
+          "delay_samples": 2,
+          "training_windows": 84,
+          "validation_windows": 65,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.0045309322908257225,
+              "B": 0.005100284100500662,
+              "F": 0.06970642257399748,
+              "L": -0.0016495766634722115
+            },
+            "physical": true,
+            "current_fitness": 0.9728784517567944,
+            "velocity": {
+              "rmse": 0.21560627357374326,
+              "fitness": 0.9517037552763756,
+              "samples": 1597,
+              "segments": 32,
+              "accepted": true
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        }
+      ],
+      "record": {
+        "name": "m2006_trace_20261025_185931.bin",
+        "sha256": "8db228da3e6c093f6d111606c07f909cd6e17cd78259b8a71939190446c847fb",
+        "rows": 6000
+      },
+      "firmware_replay": [
+        {
+          "method": "exponential_rls",
+          "delay_samples": 0,
+          "accepted": true,
+          "M": 0.00435814680531621,
+          "B": 0.0040219565853476524,
+          "F": 0.06547322124242783,
+          "fitness": 0.9117186069488525,
+          "validation_fitness": 0.8850014209747314,
+          "windows": 346,
+          "rejected_windows": 253,
+          "status": 4
+        },
+        {
+          "method": "exponential_rls",
+          "delay_samples": 2,
+          "accepted": true,
+          "M": 0.004345955327153206,
+          "B": 0.004571198020130396,
+          "F": 0.06933171302080154,
+          "fitness": 0.9257112145423889,
+          "validation_fitness": 0.838074266910553,
+          "windows": 345,
+          "rejected_windows": 254,
+          "status": 4
+        },
+        {
+          "method": "sift_rls",
+          "delay_samples": 0,
+          "accepted": true,
+          "M": 0.004358143080025911,
+          "B": 0.0040214210748672485,
+          "F": 0.06547463685274124,
+          "fitness": 0.9117186069488525,
+          "validation_fitness": 0.8850014209747314,
+          "windows": 346,
+          "rejected_windows": 253,
+          "status": 4
+        },
+        {
+          "method": "sift_rls",
+          "delay_samples": 2,
+          "accepted": true,
+          "M": 0.004345955327153206,
+          "B": 0.004571220371872187,
+          "F": 0.06933161616325378,
+          "fitness": 0.9257112145423889,
+          "validation_fitness": 0.838074266910553,
+          "windows": 345,
+          "rejected_windows": 254,
+          "status": 4
+        }
+      ]
+    },
+    {
+      "comparisons": [
+        {
+          "window_s": 0.01,
+          "delay_samples": 0,
+          "training_windows": 495,
+          "validation_windows": 199,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.002979952211149087,
+              "B": 0.0,
+              "F": 0.07251183387712606,
+              "L": -0.0021095792637903774
+            },
+            "physical": true,
+            "current_fitness": 0.7554503449510228,
+            "velocity": {
+              "rmse": 0.5822806040055671,
+              "fitness": 0.6799654999940161,
+              "samples": 1063,
+              "segments": 19,
+              "accepted": false
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.01,
+          "delay_samples": 2,
+          "training_windows": 494,
+          "validation_windows": 200,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.0029382977320752245,
+              "B": 0.0,
+              "F": 0.07728583713010459,
+              "L": -0.0012403314319858394
+            },
+            "physical": true,
+            "current_fitness": 0.8018503778383141,
+            "velocity": {
+              "rmse": 0.6166001778343381,
+              "fitness": 0.6411281100790851,
+              "samples": 1063,
+              "segments": 19,
+              "accepted": false
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.02,
+          "delay_samples": 0,
+          "training_windows": 229,
+          "validation_windows": 92,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.00381373276779833,
+              "B": 0.0,
+              "F": 0.07226204370959725,
+              "L": -0.0027537295172298274
+            },
+            "physical": true,
+            "current_fitness": 0.9148830437530637,
+            "velocity": {
+              "rmse": 0.2963252539586059,
+              "fitness": 0.917116233021659,
+              "samples": 1063,
+              "segments": 19,
+              "accepted": true
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.02,
+          "delay_samples": 2,
+          "training_windows": 228,
+          "validation_windows": 92,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.0038879575918110165,
+              "B": 0.0,
+              "F": 0.07704759646882162,
+              "L": -0.001083255254421449
+            },
+            "physical": true,
+            "current_fitness": 0.9133980927503363,
+            "velocity": {
+              "rmse": 0.310199805528064,
+              "fitness": 0.9091729533249941,
+              "samples": 1063,
+              "segments": 19,
+              "accepted": true
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.04,
+          "delay_samples": 0,
+          "training_windows": 98,
+          "validation_windows": 39,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.004307002304468004,
+              "B": 0.0,
+              "F": 0.0712251294865258,
+              "L": -0.0014832283165498363
+            },
+            "physical": true,
+            "current_fitness": 0.973156169796484,
+            "velocity": {
+              "rmse": 0.2264837918786665,
+              "fitness": 0.9515820491088091,
+              "samples": 1063,
+              "segments": 19,
+              "accepted": true
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        },
+        {
+          "window_s": 0.04,
+          "delay_samples": 2,
+          "training_windows": 98,
+          "validation_windows": 38,
+          "least_squares": {
+            "available": true,
+            "parameters": {
+              "M": 0.004332802625993982,
+              "B": 0.004401618415064322,
+              "F": 0.06850281678690201,
+              "L": -0.0007090463135051632
+            },
+            "physical": true,
+            "current_fitness": 0.9703731425455333,
+            "velocity": {
+              "rmse": 0.2412334128605786,
+              "fitness": 0.9450703195335298,
+              "samples": 1063,
+              "segments": 19,
+              "accepted": true
+            }
+          },
+          "instrumental_variables": {
+            "available": false,
+            "reason": "missing independent reference"
+          }
+        }
+      ],
+      "record": {
+        "name": "m2006_trace_20261025_192135.bin",
+        "sha256": "969fcbe6871a27a9eebb65eea5018cc815adb239ab63b6fc554aaa2164c5889b",
+        "rows": 6000
+      },
+      "firmware_replay": [
+        {
+          "method": "exponential_rls",
+          "delay_samples": 0,
+          "accepted": true,
+          "M": 0.003951227758079767,
+          "B": 0.0,
+          "F": 0.07133082300424576,
+          "fitness": 0.8870784044265747,
+          "validation_fitness": 0.886064350605011,
+          "windows": 321,
+          "rejected_windows": 278,
+          "status": 4
+        },
+        {
+          "method": "exponential_rls",
+          "delay_samples": 2,
+          "accepted": true,
+          "M": 0.003910444211214781,
+          "B": 0.0,
+          "F": 0.07695326209068298,
+          "fitness": 0.9116073250770569,
+          "validation_fitness": 0.8532316088676453,
+          "windows": 320,
+          "rejected_windows": 279,
+          "status": 4
+        },
+        {
+          "method": "sift_rls",
+          "delay_samples": 0,
+          "accepted": true,
+          "M": 0.003951236139982939,
+          "B": 0.0,
+          "F": 0.07133107632398605,
+          "fitness": 0.8870784044265747,
+          "validation_fitness": 0.886064350605011,
+          "windows": 321,
+          "rejected_windows": 278,
+          "status": 4
+        },
+        {
+          "method": "sift_rls",
+          "delay_samples": 2,
+          "accepted": true,
+          "M": 0.003910444676876068,
+          "B": 0.0,
+          "F": 0.07695386558771133,
+          "fitness": 0.9116073250770569,
+          "validation_fitness": 0.8532316088676453,
+          "windows": 320,
+          "rejected_windows": 279,
+          "status": 4
+        }
+      ]
+    }
+  ]
+}

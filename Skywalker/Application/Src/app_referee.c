@@ -319,11 +319,11 @@ bool RefereePackFrame(RefereeObject *referee, uint16_t cmd_id,
     return false;
   }
 
-  uint16_t length = (uint16_t)(data_length + kRefereeFrameMinLength);
-  if (length > tx_buffer_length)
+  if ((uint32_t)data_length + kRefereeFrameMinLength > tx_buffer_length)
   {
     return false;
   }
+  uint16_t length = (uint16_t)(data_length + kRefereeFrameMinLength);
 
   tx_buffer[0] = kRefereeSof;
   tx_buffer[1] = (uint8_t)(data_length & 0xFFU);
@@ -368,6 +368,5 @@ bool RefereeSend(RefereeObject *referee, uint16_t cmd_id, const uint8_t *data,
     return false;
   }
 
-  UartTransmit(referee->tx_huart, tx_buffer, frame_length);
-  return true;
+  return UartTransmitTry(referee->tx_huart, tx_buffer, frame_length);
 }

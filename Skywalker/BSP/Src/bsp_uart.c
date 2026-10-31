@@ -94,15 +94,41 @@ void UartInit(UART_HandleTypeDef *huart, UartRxCallback callback)
 void UartTransmit(UART_HandleTypeDef *huart, uint8_t *tx_data,
                   uint16_t tx_length)
 {
+  (void)UartTransmitTry(huart, tx_data, tx_length);
+}
+
+/**
+ * @brief 提交UART DMA发送
+ * @param huart UART句柄
+ * @param tx_data 发送数据指针
+ * @param tx_length 发送长度
+ * @return 是否成功提交
+ */
+bool UartTransmitTry(UART_HandleTypeDef *huart, uint8_t *tx_data,
+                     uint16_t tx_length)
+{
   uint32_t index = UartIndex(huart);
   if (index == 0xFFU || tx_data == NULL || tx_length == 0U ||
-      tx_length > kUartBufferSize || huart->gState != HAL_UART_STATE_READY)
+      tx_length > kUartBufferSize || !UartTransmitReady(huart))
   {
-    return;
+    return false;
   }
 
   memcpy(g_uart_object[index].tx_buffer, tx_data, tx_length);
-  (void)HAL_UART_Transmit_DMA(huart, g_uart_object[index].tx_buffer, tx_length);
+  return HAL_UART_Transmit_DMA(huart, g_uart_object[index].tx_buffer,
+                               tx_length) == HAL_OK;
+}
+
+/**
+ * @brief 检查UART DMA发送通道是否空闲
+ * @param huart UART句柄
+ * @return 是否可立即提交发送
+ */
+bool UartTransmitReady(UART_HandleTypeDef *huart)
+{
+  return huart != NULL && UartIndex(huart) != 0xFFU &&
+         huart->gState == HAL_UART_STATE_READY && huart->hdmatx != NULL &&
+         huart->hdmatx->State == HAL_DMA_STATE_READY;
 }
 
 /**

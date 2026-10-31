@@ -26,8 +26,18 @@ typedef enum
   kAutotuneInvalidSample,
   kAutotuneMotionLimit,
   kAutotuneInsufficientModel,
-  kAutotuneTrackingError
+  kAutotuneTrackingError,
+  kAutotunePredictionError
 } AutotuneError;
+
+// 主动辨识阶段，方向下标0为正向、1为反向
+typedef enum
+{
+  kAutotuneProbe,
+  kAutotuneQuasistatic,
+  kAutotuneDynamic,
+  kAutotuneModelValidation
+} AutotuneIdentificationStage;
 
 // 自动整定配置结构体，运动量与控制器反馈使用相同坐标
 typedef struct
@@ -43,6 +53,12 @@ typedef struct
   bool adaptive;              // 正常运行时缓慢更新模型及增益
   SysidMethod identification; // 辨识更新方法
   bool optimize;              // 验证速度环时优化PI性能
+  // 滑动辨识最低速度（rad/s），0使用速度上限的1%
+  float identification_min_speed;
+  // 辨识电流配对延迟采样数
+  uint8_t identification_current_delay_samples;
+  float identification_window;  // 积分窗口（s），0使用20ms
+  float identification_timeout; // 辨识总时长上限（s），0使用20s
 } AutotuneConfig;
 
 // 自动整定结果结构体
@@ -68,6 +84,13 @@ typedef struct
   AutotuneError error;
   SysidObject sysid;
   SysidObject rotor_sysid;
+  SysidPrediction prediction;
+  SysidPrediction rotor_prediction;
+  AutotuneIdentificationStage identification_stage;
+  float stage_time;
+  float startup_current[2];
+  bool startup_observed[2];
+  uint8_t identification_direction;
   SysidModel validated_model;
   PidObject speed_pid;
   PidObject position_pid;
@@ -88,11 +111,27 @@ typedef struct
   float rotor_inertia;
   float excitation_time;
   float excitation_peak;
+  float excitation_motion_time;
+  float excitation_pulse_time;
+  float test_frequency;
+  float position_frequency;
+  float position_amplitude;
+  float design_bandwidth;
+  float damping;
+  float settling_time;
+  float best_score;
+  float best_bandwidth;
+  float best_damping;
+  uint32_t excitation_windows;
+  uint32_t excitation_direction[2];
   uint32_t samples;
   uint32_t random;
   uint32_t pulse_ticks;
   uint32_t adaptive_count;
   uint8_t attempt;
+  uint8_t search_index;
+  bool preparing;
+  bool search_finished;
   bool has_dob;
   bool applied;
   bool optimization_pending;  // 等最终执行量反馈后结束优化窗口

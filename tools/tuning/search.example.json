@@ -1,0 +1,15 @@
+{
+  "bounds": [[12.0, 24.0], [0.8, 1.4], [0.0, 1.0]],
+  "objectives": ["rms_error", "rms_slew"],
+  "reference": [0.3, 100.0],
+  "limits": {
+    "rms_error": 0.3,
+    "overshoot": 0.2,
+    "saturation": 0.2
+  },
+  "relative_noise": 0.03,
+  "length_scale": 0.3,
+  "posterior_samples": 64,
+  "pool_size": 256,
+  "seed": 0
+}

@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    name: Firmware / ${{ matrix.preset }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Show toolchain
+        run: |
+          cmake --version
+          ninja --version
+          arm-none-eabi-gcc --version
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }} --parallel 2
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v7
+        with:
+          name: firmware-${{ matrix.preset }}
+          path: |
+            build/${{ matrix.preset }}/h7_framework.elf
+            build/${{ matrix.preset }}/h7_framework.map
+          if-no-files-found: error
+          retention-days: 7
+
+  tools:
+    name: Python tools
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-venv
+          /usr/bin/python3 -m venv .venv
+          .venv/bin/python -m pip install -r tools/tuning/requirements.txt
+
+      - name: Check syntax
+        run: .venv/bin/python -m compileall -q tools/tuning
+
+      - name: Check command entry points
+        run: |
+          .venv/bin/python tools/tuning/collect.py --help
+          .venv/bin/python tools/tuning/tune.py --help

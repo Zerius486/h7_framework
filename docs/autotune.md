@@ -1,6 +1,25 @@
 # 自动整定与辨识
 
-整定、辨识和自适应均在 H7 上运行，通过普通 C 接口使用。算法负责模型、激励与验证；应用负责采样、控制权切换、执行指令、开始/取消入口和结果保存。默认应用尚未接入这些流程。
+整定在 H7 上执行。应用提供采样、控制权切换、电流发送、开始/取消和结果保存。
+
+| 需求 | 接口 |
+| --- | --- |
+| 只辨识机械模型 | `alg_sysid.h` |
+| 由模型生成一组参数，可选慢速自适应 | `alg_autotune.h` |
+| 按性能约束搜索多组参数 | `alg_motor_tune.h` |
+| 优化已有速度 PI | `alg_pid_tune.h` |
+| 为闭环频响提供多正弦参考 | `alg_multisine.h` |
+| 离线对照与候选建议 | [tools/tuning](../tools/tuning/README.md) |
+
+当前主动整定需要有限行程边界，测试包含正反运动。SIFt-RLS、PI 优化和帕累托搜索按实验功能使用；当前未提供连续旋转、单向机构模式、整定结果的结构化导出及 NN 训练。原始串口波形和基础运行元数据可用本地[采集工具](../tools/tuning/README.md)保存。
+
+## 保存一次整定记录
+
+板端日志通道由 `g_app_debug_log_config.enabled` 控制，默认关闭。开启后，`AppTuneLogInit()` 在 `AppConfigInit()` 中初始化记录器。当前默认使用 UART7、921600 baud；串口波特率必须和 CubeMX 外设配置相同，并连接 USB-UART 适配器到采集电脑。
+
+应用需在对应电机控制周期中调用整定日志适配器。`Autotune` 在每次 `AutotuneUpdate()`、最终限幅与发送量跟踪完成后调用 `AppTuneLogAutotune()`；`MotorTune` 在每次 `MotorTuneUpdate()` 和 `MotorTuneTrackOutput()` 之后调用 `AppTuneLogMotorTune()`。每个适配器只传对应的整定对象。首次检测到整定活跃时开始记录，检测到结束状态时缓存结果事件并请求停止采样。两个适配器都会处理缓存发送，结束后仍须周期调用；若不再调用适配器，则改为在同一任务周期调用 `AppTuneLogProcess()`，直到剩余事件与结束摘要发送完成。应用若不调用适配器，就不会产生整定记录。示例参数须取同一控制周期的实际值，尤其 `executed_current` 应是应用最终发送的电流指令。
+
+采集程序和输出文件格式见[整定数据采集与离线分析](../tools/tuning/README.md)。该采集器会保存串口收到的原始字节，并统计坏 CRC 与帧序号缺口。固件端 UART 忙时会跳过日志帧；元数据中的序号缺口可用于发现丢帧，但不能恢复丢失的波形。默认关闭记录器不会增加业务串口发送。
 
 ## 单电机整定
 
@@ -18,8 +37,12 @@
 | `adaptive` | 应用参数后是否允许慢速自适应 |
 | `identification` | `kSysidExponential` 为原指数遗忘 RLS；`kSysidSubspace` 为 SIFt-RLS |
 | `optimize` | 模型整定后，是否增加速度 PI 性能优化与最终验证 |
+| `identification_min_speed` | 滑动辨识最低速度，rad/s；0 使用速度上限的 1% |
+| `identification_current_delay_samples` | 辨识时使用的电流历史采样数，0～32；0 关闭 |
+| `identification_window` | 积分窗口，s；0使用20ms与4个采样周期中的较大值，显式配置范围为采样周期～0.1s |
+| `identification_timeout` | 辨识总时长上限，s；0使用20s，显式配置至少12s |
 
-两个新增字段均可省略：零初始化时保持原辨识方法，关闭性能优化。这些扩展属于 2.0 实验功能。
+`identification` 和 `optimize` 零初始化时，使用指数遗忘 RLS，关闭 PI 性能优化。
 
 ### 调用顺序
 
@@ -28,39 +51,72 @@
 3. 活跃期间，每周期调用 `AutotuneUpdate(tune, position, omega, actual_current, rotor_omega)`，返回测试电流。
 4. 应用限幅或功率分配后发送电流，并用 `AutotuneTrackOutput()` 反馈最终执行电流指令。
 5. 通过 `state`、`error` 和 `result` 获取进度、原因与结果。仅 `kAutotuneComplete` 表示完成验证。
-6. 调用 `AutotuneApply()` 将完成验证的参数及控制状态写入运行中的速度 PID、可选位置 PID 和 DOB。结果也可另行保存后用于正式应用。
+6. 调用 `AutotuneApply()` 将参数及控制状态写入运行中的速度 PID、可选位置 PID 和 DOB。
 
 `AutotuneIsActive()` 用于判断是否继续接管；`AutotuneCancel()` 结束测试。退出测试后的输出与业务切换由应用处理。
 
-`position` 使用连续角度，不能把跨越 ±π 的原始编码器值直接作为有限行程。`omega` 与控制器使用相同的反馈坐标；`rotor_omega` 为转子侧角速度，供 DOB 使用。电流均为 A，实际反馈电流与最终执行电流指令是两个不同输入。
+`position` 使用连续角度，不能把跨越 $\pm\pi$ 的原始编码器值直接作为有限行程。`omega` 与控制器使用相同的反馈坐标；`rotor_omega` 为转子侧角速度，供 DOB 使用。电流均为 A，实际反馈电流与最终执行电流指令是两个不同输入。
 
 ### 模型与增益
 
 内部电流环相对机械运动足够快时，采用电流坐标机械模型：
 
-```text
-i = M * dω/dt + B * ω + F * sign(ω) + L
-M = J/Kt, B = b/Kt
-```
+$$
+i = M\frac{d\omega}{dt} + B\omega + F\operatorname{sign}(\omega) + L
+$$
+
+$$
+M = \frac{J}{K_t}, \qquad B = \frac{b}{K_t}
+$$
+
+这里的 $J$、$b$ 和 $K_t$ 必须对应所用角速度的同一轴侧。返回字段 `inertia` 是电流坐标参数 $M$，单位为 $\mathrm{A\,s^2/rad}$，不是单位为 $\mathrm{kg\,m^2}$ 的转动惯量；`viscous` 为 $B$，单位为 $\mathrm{A\,s/rad}$，`friction` 和 `bias` 的单位均为 A。DOB 配置使用转子侧物理惯量，不能直接填入 `model.inertia`。
 
 对一个采样窗口积分：
 
-```text
-∫i dt = M * Δω + B * ∫ω dt + F * ∫sign(ω) dt + L * Δt
-```
+$$
+\int i\,dt = M\Delta\omega + B\int\omega\,dt + F\int\operatorname{sign}(\omega)\,dt + L\Delta t
+$$
 
-固定四维 RLS 辨识惯性、黏性、库仑摩擦和恒定负载，避免直接对速度微分。辨识使用归一化和模型质量条件。独立使用时，按顺序调用 `SysidInit()`、`SysidUpdate()`、`SysidGetModel()`。
+四维 RLS 用窗口积分辨识惯性、黏性、库仑摩擦和恒定负载，避免直接差分速度。独立使用时依次调用 `SysidInit()`、`SysidUpdate()`、`SysidGetModel()`，模型读取须通过质量检查。
 
-速度 PI 以设计自然频率 `ωn` 为基础：
+速度 PI 以设计自然频率 $\omega_n$ 为基础：
 
-```text
-Kp = 2 * ωn * M - B
-Ki = M * ωn²
-```
+$$
+K_p = 2\zeta\omega_n M - B, \qquad K_i = M\omega_n^2
+$$
 
-实现还会检查可用增益、降低验证未通过的带宽，并按配置继续验证位置外环及 DOB。`result.bandwidth` 单位为 rad/s，`dob_cutoff_hz` 单位为 Hz。`PidObject.integral_max` 表示误差积分限幅，若积分电流预算为 `I_max`，应按 `I_max / Ki` 换算。
+该关系匹配名义闭环特征多项式，$\zeta$ 为设计阻尼比，初始取 1。`Autotune` 将 $K_p$ 下限设为 $0.1\omega_nM$，以保持正增益。
 
-该模型假设实际电流能代表转矩输入。若目标机械带宽接近内电流环动态，需要再评价内环滞后；初始辨识不要求加入完整电气状态。
+实现会在固定轨迹上比较初始自然频率的 1、0.6、1.6 倍和阻尼比 1、1.4，共六组参数；自然频率仍受采样周期限制。保存通过基准跟踪条件且误差评分最低的一组，再重复验证，并按配置继续验证位置外环及 DOB。重试不改变参考频率、幅度或时长。`result.bandwidth` 保存设计自然频率，单位为 rad/s，不是实测的闭环 −3 dB 带宽；`dob_cutoff_hz` 单位为 Hz。`PidObject.integral_max` 表示误差积分限幅，若积分电流预算为 $I_{\max}$，应按 $I_{\max}/K_i$ 换算。
+
+目标机械带宽接近内电流环动态时，需要评价内环滞后对该模型的影响。
+
+### 分阶段激励
+
+主动辨识按以下顺序进行，进度在`identification_stage`中：
+
+1. `kAutotuneProbe`：正反向各0.75s电流斜坡，记录首次达到滑动速度阈值的实际电流。
+2. `kAutotuneQuasistatic`：正反向各1.5s慢斜坡，补充阻尼与摩擦数据。
+3. `kAutotuneDynamic`：至少4s变长随机脉冲，补充惯性激励；幅度随实际运动调整。
+4. `kAutotuneModelValidation`：冻结模型，另采2s电流和速度，做自由速度预测。
+
+各阶段共用速度和行程限制，斜坡会叠加速度约束，不能把首次滑动电流当作严格的静摩擦测量值。`startup_current[0/1]`分别对应正/负方向，`startup_observed`说明是否观测到。阶段切换清除未完成的积分窗口，已拟合参数保留。起动、低速、滑动和动态数据按用途处理，不要求滑动模型解释静摩擦全过程。
+
+### 数据配对与模型检查
+
+`identification_current_delay_samples` 只用于辨识，将历史反馈电流与当前速度配对。按固定调用周期计算延迟：$T_d=N\Delta t$。例如实测需要 4 ms 配对时，1 ms 周期设置 4，2 ms 周期设置 2。启动和重新初始化辨识器时先填满历史；PID、DOB 的实时反馈不经过这条历史队列。
+
+延迟应由同一套采样链测量，不按电机型号默认写死。RPM 与编码器速度的比较可以提供线索，但不能独自证明电流与 RPM 的确切延迟。
+
+一个积分窗口必须全程高于最低滑动速度且没有换向，才参与机械模型辨识。最低速度应结合反馈分辨率和实际滑动状态设置；零初始化的 1% 是兼容默认值。静止、起动和过零窗口不用于这个滑动摩擦模型，`sysid.rejected_windows` 记录被排除的窗口数。原始样本仍由应用保留。
+
+读取模型时枚举阻尼、摩擦的非负约束，并重新求解其余参数。惯量不取绝对值，也不钳成正数。`fitness` 用返回模型重新计算，不能沿用约束前的拟合度。
+
+匀速窗口参与参数拟合；每40个具有速度变化的有效窗口形成一个不重叠的数据段，用于惯量检查。不重叠不代表噪声在统计上独立。相邻两段分别做约束拟合，检查惯量是否显著大于零、两段估计的三倍标准差区间是否相容，并互相预测电流。`validation_fitness` 是两个方向中较差的交叉拟合度，要求至少 0.75；整体模型还需通过原有激励和拟合检查。标准差来自局部线性回归残差，是辨识筛选依据，不能替代实际机构验证。`result.model.status` 区分样本不足、动态激励不足、非物理模型、数据段不一致和模型可用；`AutotuneError` 的原有编号保持不变。至少需要两段有效数据，弱激励或不一致的数据继续采集，主动辨识默认最长20s，可通过`identification_timeout`修改。
+
+模型通过上述检查后，还要在后续数据上验证速度预测：每个连续滑动片段仅在起点注入实测速度，随后用实际电流积分模型；片段最长250ms，过零、低速后重新开始。至少累计0.5s有效预测、4个片段和足够速度变化，要求`velocity_fitness >= 0.75`。`velocity_rmse`单位为rad/s。预测失败返回新增的`kAutotunePredictionError`，不生成PI。独立使用时依次调用`SysidPredictionInit/Update/GetResult`；`GetResult`仅更新传入模型的两个速度指标，模型参数保持不变。
+
+`kAutotuneComplete` 表示模型和基准轨迹验证完成。若需要限制超调、调节时间等性能，使用下面的 `MotorTuneConfig.limits`，并在所需工作轨迹上确认结果；当前测试参考含过渡段，不是理想阶跃。
 
 ### SIFt-RLS 辨识
 
@@ -68,35 +124,39 @@ Ki = M * ωn²
 
 每个积分窗口是一条标量观测，使用归一化回归向量 `x`、信息矩阵 `R`、协方差 `P`：
 
-```text
-R_next = R - (1 - λ) * (R*x)*(R*x)' / (x'*R*x) + x*x'
-P_next = inverse(R_next)
-θ_next = θ + P_next*x*(y - x'*θ)
-```
+$$
+R_{k+1}=R_k-(1-\lambda)\frac{(R_kx)(R_kx)^\mathsf{T}}{x^\mathsf{T}R_kx}+xx^\mathsf{T}
+$$
 
-只沿当前信息方向遗忘，弱激励时保留其他方向的信息；未激励的参数仍不能被辨识。四维信息矩阵采用 double 和固定尺寸 Cholesky 求逆，避免单精度下共线方向的信息丢失，不使用堆分配、通用矩阵库或 SVD。
+$$
+P_{k+1}=R_{k+1}^{-1}, \qquad \theta_{k+1}=\theta_k+P_{k+1}x(y-x^\mathsf{T}\theta_k)
+$$
 
-`memory_time` 控制遗忘系数，不等于参数收敛时间；系数仍有原实现的 0.98 下限。短积分窗口下惯性对应的回归分量可能很小，惯量变化的跟踪会明显慢于指数遗忘。它是可选对照方案，并非所有工况下更快。
+SIFt 只沿当前信息方向遗忘，弱激励时保留其他方向的信息。实现使用 double 四维信息矩阵和固定尺寸 Cholesky 求逆。
+
+`memory_time` 控制遗忘系数，下限为 0.98。短积分窗口下，惯性回归分量较小，惯量变化的跟踪可能慢于指数遗忘；选用前应以同一段数据对照。
 
 ### 速度 PI 性能优化
 
-设置 `optimize = true`，调用顺序与原整定接口相同。流程为：辨识 → PI 初值 → 重复速度测试与参数优化 → 最优参数的独立速度验证 → 可选位置/DOB 验证。
+设置 `optimize = true`，调用顺序与原整定接口相同。流程为：辨识 → PI 初值 → 重复速度测试与参数优化 → 最优参数的后续速度验证 → 可选位置/DOB 验证。
 
-实现位于 `alg_pid_tune.h/.c`，借鉴 DiffTune+ 的敏感度传播与沿梯度预测步长，仅优化 `log(Kp)`、`log(Ki)`。这是本工程的低维实现，不是完整论文工具链的移植。名义机械响应按一阶模型精确离散，积分、误差过零衰减、条件积分及内部分段限幅均参与敏感度计算。
+`alg_pid_tune` 借鉴 DiffTune+ 的敏感度传播与沿梯度预测步长，优化 $\log K_p$、$\log K_i$。机械模型按一阶响应精确离散；积分、过零衰减、条件积分和内部分段限幅参与敏感度计算。
 
 每轮使用相同的参考频率、幅度和测试时长，前四分之一作为过渡段，不计入损失。归一化损失为：
 
-```text
-loss = mean((error / feedback_scale)^2
-          + output_weight * (output / output_max)^2
-          + change_weight * (delta_output / output_max)^2)
-```
+$$
+\mathcal{L}=\operatorname{mean}\left[\left(\frac{e}{s_y}\right)^2
++w_u\left(\frac{u}{u_{\max}}\right)^2
++w_{\Delta u}\left(\frac{\Delta u}{u_{\max}}\right)^2\right]
+$$
+
+其中 $e$ 为跟踪误差，$s_y$ 对应 `feedback_scale`，$u$ 为输出，$u_{\max}$ 对应 `output_max`，$\Delta u$ 为相邻输出之差；$w_u$、$w_{\Delta u}$ 分别对应 `output_weight`、`change_weight`。
 
 内置整定的两个输出代价权重均为 0.01。根据累计残差梯度与二次近似曲率选择步长；每次增益变化限制在 0.8～1.25 倍，总范围为初值的 0.25～4 倍，最多评价 6 轮。实际损失变差时恢复已测得的最佳参数，结束优化后再验证。`optimizer.result` 提供初始损失、最佳损失、最佳增益和已评价轮数。
 
-速度优化与最终速度验证期间不叠加加速度前馈或 DOB；位置与 DOB 在后续阶段单独验证。当前优化的是速度内环，位置环仍使用原整定方法，没有对位置、DOB 或滤波器传播完整闭环梯度。
+速度优化及最终速度验证期间不叠加前馈或 DOB；位置与 DOB 随后单独验证。
 
-外部功率分配或限幅的导数未知，必须调用 `AutotuneTrackOutput()`。本轮出现执行指令与请求不一致时，优化器标记 `kPidTuneLimited`，恢复已验证参数，再进行普通速度验证；整定本身仍可继续。`kPidTuneInvalidSample` 同样结束参数优化并恢复已验证增益。是否整定成功以 `AutotuneObject.state` 为准，不能只看优化器状态。
+调用 `AutotuneTrackOutput()` 反馈最终执行量。出现外部限幅时，优化器标记 `kPidTuneLimited`，恢复已验证增益并转入普通速度验证。`kPidTuneInvalidSample` 同样结束优化。整定是否完成以 `AutotuneObject.state` 为准。
 
 ### 独立使用 PI 优化器
 
@@ -105,11 +165,11 @@ loss = mean((error / feedback_scale)^2
 3. 每周期用 `PidTuneCalculate()` 代替本轮的 `PidCalculate()`；发送最终输出后调用 `PidTuneTrackOutput()`。
 4. 一个固定测试窗口结束后调用 `PidTuneFinish()`；返回 true 时以新增益重复同一测试，false 时查看 `state` 与 `result`。
 
-独立使用时，调用方负责重复参考轨迹、保持可比工况，并在每轮前安排一致的控制器/机构初始状态或足够的过渡段。测试期间不修改 PI 增益、模式或内部状态。该接口使用输入到反馈的一阶名义模型；若接入其他外环，必须提供该环坐标下的有效模型，不能直接套电机模型。
+每轮使用相同参考轨迹、可比工况和初始状态，或安排足够过渡段；测试期间不修改 PI 状态。优化器使用输入到反馈的一阶名义模型，接入其他外环时需提供对应坐标下的模型。
 
 ## 单电机性能约束与帕累托整定
 
-`alg_motor_tune.h/.c` 提供 2.0 实验接口，面向 M2006、M3508 和 GM6020 的电流指令机械控制。内部复用 `alg_autotune` 建立模型及基准控制器，再完成机构特征测量、有限网格搜索和独立轨迹验证。所有计算与测试状态均在板端，无需上位机搜索器。使用静态 `MotorTuneObject`，不分配堆内存。
+`alg_motor_tune` 面向 M2006、M3508 和 GM6020，复用 `alg_autotune` 建立模型与基准控制器，再测量机构特征、搜索候选并重复验证。对象使用静态 `MotorTuneObject`。
 
 流程为：
 
@@ -118,11 +178,11 @@ loss = mean((error / feedback_scale)^2
   → 回到初始位置
   → 基准控制器的方向/低速/换向/工作速度测试
   → 可选三个角度的保持电流测量
-  → 候选训练 → 满足约束后独立验证 → 下一候选
+  → 候选训练 → 满足约束后搜索内验证 → 下一候选
   → 从所有通过验证的候选中筛选帕累托集合
 ```
 
-每轮测试前使用基准控制器回到同一初始位置并静止，避免将不同起始状态当成参数差别。每条轨迹有 16 段，每段前半程用三次平滑插值改变目标，后半程保持。速度训练包含双向 12% 低速、双向工作速度和停转；位置训练包含小幅往返、全幅往返和保持。验证改用不同的顺序及 25%、40%、85% 幅度。每个可行候选都独立验证，最终才比较支配关系。
+每轮用基准控制器回到初始位置并静止。每条轨迹 16 段，前半段三次插值、后半段保持。速度训练包含双向 12% 低速、工作速度和停转；位置训练包含小幅、全幅往返和保持。验证采用不同顺序及 25%、40%、85% 幅度。
 
 ### 物理参数与性能范围
 
@@ -130,27 +190,28 @@ loss = mean((error / feedback_scale)^2
 
 | 配置 | 含义 |
 | --- | --- |
-| `bandwidth` | 自然频率 `ωn` 的上下限、点数，rad/s；上限为 `0.08 / sampling_time` |
-| `damping` | 阻尼比 `ζ` 的上下限、点数，允许 0.2～3 |
-| `feedforward` | 加速度前馈比例 `kff` 的上下限、点数，允许 0～1.5 |
-| `speed_amplitude` | 希望测试的最大速度，不超过 `0.8 * speed_limit` |
-| `position_amplitude` | 位置测试幅度；启动位置至较近边界的距离至少是其 `1/0.3` 倍 |
-| `segment_time` | 单段时长，0.1～10 s，且至少 20 个采样周期 |
-| `settling_band` | 相对测试幅度的稳定带，0～0.5 之间 |
+| `bandwidth` | 自然频率 $\omega_n$ 的上下限、预算因子`count`，rad/s；上限为 $0.08/\Delta t$，其中 $\Delta t$ 对应 `sampling_time` |
+| `damping` | 阻尼比 $\zeta$ 的上下限、预算因子`count`，允许 $0.2$～$3$ |
+| `feedforward` | 加速度前馈比例 $k_{\mathrm{ff}}$ 的上下限、预算因子`count`，允许 $0$～$1.5$ |
+| `speed_amplitude` | 希望测试的最大速度，不超过 $0.8\,\text{speed\_limit}$ |
+| `position_amplitude` | 位置测试幅度；启动位置至较近边界的距离至少是其 $1/0.3$ 倍 |
+| `segment_time` | 单段时长，$0.1$～$10\,\mathrm{s}$，且至少 20 个采样周期 |
+| `settling_band` | 相对测试幅度的稳定带，$0$～$0.5$ 之间 |
 | `limits` | 跟踪 RMS、超调、调节时间、保持波动、电流变化率、饱和比例的上限；单项 0 表示不约束 |
 
-每个搜索维度取 1～3 个等间隔点，共最多 27 个候选。单点范围的上下限必须相等。候选使用以下可解释的参数关系：
+`count`仍取1～3，1表示固定维度，固定时上下限必须相等；三个`count`的乘积作为默认预算，不再表示等间隔网格。`search_budget`可显式指定1～27组。先测中心与各活动维度的上下边界，再围绕已验证的非支配候选细化，步长依次为该维范围的1/4、1/8、1/16、1/32。没有已验证可行点时，围绕约束归一化违反程度最小的候选细化。重复参数不占新预算；预算较小时按带宽、阻尼、前馈的顺序填入初始边界。候选使用以下可解释的参数关系：
 
-```text
-Kp = 2 * ζ * ωn * M - B
-Ki = M * ωn²
-速度 PID 的导数前馈系数 = kff * M
-位置外环 Kp = 0.15 * ωn
-```
+$$
+K_p = 2\zeta\omega_n M - B, \qquad K_i = M\omega_n^2, \qquad K_{d,\mathrm{ff}} = k_{\mathrm{ff}}M
+$$
 
-非正或无效的 PI 增益标记为 `kMotorTuneInvalidDesign`，不会偷偷修改成另一组物理参数。速度 PID 使用现有的目标差分前馈、积分限幅和抗饱和；导出的 `PidConfig` 与测试配置一致。位置模式评价的是位置误差，速度模式评价的是速度误差，位置外环比例随速度带宽变化，本版不再单独搜索外环比例。
+$$
+K_{p,\mathrm{position}} = 0.15\omega_n
+$$
 
-速度测试幅度会按初始行程缩小，实际采用值在 `result.profile.tested_speed`。因此狭小位置机构的速度特征不代表电机全速特征。`segment_time` 应足够容纳目标响应：若所有候选都来不及稳定，结果会明确失败，不放宽用户给定的指标。
+非正或无效增益标记为 `kMotorTuneInvalidDesign`。速度 PID 使用目标差分前馈、积分限幅和抗饱和；位置外环比例随速度带宽生成。导出的 `PidConfig` 与测试配置一致，评价误差取当前测试模式的反馈坐标。
+
+速度测试幅度按初始行程缩小，实际值在 `result.profile.tested_speed`。`segment_time` 应足够容纳目标响应，否则候选会因未稳定被拒绝。
 
 ### 指标和特征含义
 
@@ -163,11 +224,15 @@ Ki = M * ωn²
 - `rms_slew`：最终发送电流指令的变化率均方根，A/s。
 - `saturation`：内部电流饱和或外部分配改变指令的采样比例。
 
-只有所有保持段的最后 10% 保持在稳定带内，才将 `settled` 置为 true。约束在训练、验证中分别检查。最后在通过两次检查的候选中，同时最小化上述六项验证指标；任一项更好且其余均不差才构成支配。帕累托下标按枚举顺序保存，不暗含推荐排名。这是有限实测集合的非支配解，不是连续参数空间的全局最优证明。
+所有保持段最后10%均在稳定带内，才置`settled = true`。训练满足约束后，默认重复验证2次，`validation_repeats`允许1～3次，0使用默认值。所有重复均通过才标记可用，`validation`保留各指标最坏值，`validation_runs`记录次数。
+
+`objectives`为`MOTOR_TUNE_OBJECTIVE_*`位掩码，0默认比较跟踪误差与电流变化率，其余指标仍按`limits`约束。`comparison_tolerance`为各指标的最小有意义改进量：所有活动目标均不差，且至少一项改善超过容差才构成支配。帕累托集合只针对已测候选，下标不代表推荐排名。
+
+本文将 `training` 称为训练，`validation` 称为搜索内验证。两者都参与候选选择；最终确认另用未参与搜索的轨迹或负载，结果由应用记录。
 
 `result.profile` 保存基准闭环下的双向误差、低速误差、工作速度响应比例、启动响应时间及电流、换向响应时间及位移；位置模式还保存负位置、中心、正位置的平均反馈电流与平均角度。启动阈值为实际速度幅度的 2%，延迟包含测试参考的插值过程。`startup_observed`、`reversal_observed` 为 false 时，对应时间只是观测窗口下界；计数为 0 时表示没有有效观测。保持电流仅在位置与速度均满足条件时采集。
 
-这些特征用于定位单一惯性/阻尼/摩擦模型未解释的现象，保留给应用选择工况与后续模型扩展；本版不根据某次不对称观测自动改模型或判定故障。仅用转子反馈无法分离齿隙与闭环换向动态，`reversal_travel` 不能当成减速箱回程间隙。不同姿态保持电流是样本，不直接拟合重力模型。
+`reversal_travel` 同时受闭环响应影响，不能当作减速箱回程间隙。姿态保持电流作为样本保留，当前不据此自动改变模型。
 
 ### 接入示例
 
@@ -223,21 +288,59 @@ if (MotorTuneIsActive(&motor_tune))
 
 完成后读取 `result.pareto_count`，通过 `result.pareto[i]` 查看具体候选。选择候选后调用 `MotorTuneExport(&motor_tune, i, &speed_config, &position_config)` 导出配置；速度模式可省略位置输出。应用负责保存、初始化 PID 和接管时的控制状态，默认任务不会自动启动整定。正式控制存在外部限幅时，也应调用 `PidTrackOutput(&speed_pid, executed - request, candidate.bandwidth)`，保持与候选测试相同的抗饱和链。`MotorTuneCancel()` 可结束测试；失败原因在 `error`，原始辨识失败细节在 `baseline.error`。训练失败、验证失败和无效设计均保留在候选状态中，不会作为可用参数导出。
 
-一次训练或验证为 `16 * segment_time` 秒，特征测量另需一轮；27 组候选均通过时最多再执行 54 轮，另加辨识与各轮回中时间。可先减少网格点数再缩小范围细化。此版本输出实测参数集合与模型设计关系，尚不拟合随负载、速度、姿态变化的调度函数，也不把单电机结果直接用于整车外环。
+一次训练或验证为$16\,T_{\mathrm{segment}}$秒，特征测量另需一轮。默认每组通过的候选共用1轮训练与2轮验证；27组全部通过时为81轮，另加辨识与回中时间。`search_budget`限制候选数，不能据此当作运行时间上限。
+
+## 闭环多正弦参考
+
+`alg_multisine`只生成参考，不持有电机或控制器。应用将参考接入已有速度或位置控制器，记录实际电流和速度，离线分析电流到速度的频响。它不替代主动整定。
+
+```c
+#include "alg_multisine.h"
+
+static MultisineObject excitation;
+MultisineConfig config = {
+    .sampling_time = 0.001f,
+    .fundamental_hz = 1.0f,
+    .amplitude = 2.0f,
+    .offset = 0.0f,
+    .lower = -3.0f,
+    .upper = 3.0f,
+    .harmonic = {1, 3, 7, 13},
+    .tone_count = 4,
+    .settling_periods = 2,
+    .measurement_periods = 4};
+
+if (MultisineInit(&excitation, &config))
+{
+  (void)MultisineStart(&excitation);
+}
+```
+
+这些数值只说明接口。周期任务先采集上一周期参考及其`sample/period/measuring`对应的反馈，再调用`MultisineCalculate()`生成下一次参考，交给已有控制器。首周期平滑增幅；其后输出重复的Schroeder相位多正弦。幅值按分量幅值之和限制，整数谐波须互异且低于Nyquist频率。`period_ticks`为实际周期长度，`fundamental_hz`为量化后的实际基频。至少保留1个过渡周期和2个测量周期。
+
+最后一个测量周期输出后，下一次调用返回`offset`并退出；后续业务参考的过渡由应用处理。取消使用`MultisineCancel()`。任一控制限幅都应记录为`limited`，不能只记录参考是否越界。数据格式、工具变量频响及命令见[离线工具](../tools/tuning/README.md)。
+
+## 离线对照
+
+`tools/tuning/tune.py` 提供 `identify`、`frequency`、`propose`、`replay` 四个命令，分别用于窗口/延迟及 LS/IV 对照、完整多正弦周期分析、贝叶斯候选建议和实测候选表回放。输入分别为时序记录或逐次候选表；采集器不会自动生成候选表。命令读取数据并输出报告，H7 控制链不依赖 Python。
+
+保留原始波形、失败试验、工况和逐次候选指标，供复盘及后续本地 NN 训练使用。IV 与闭环频响需要独立外部参考；搜索策略比较需要实测候选表和最终确认数据。已有记录的辨识对照见[工具说明](../tools/tuning/README.md#已有记录的对照)，新激励方案仍需台架验证。
 
 ## 正常运行中的自适应
 
 成功 `AutotuneApply()` 后，配置启用 `adaptive` 时，每周期调用 `AutotuneAdapt()`，传入运行速度 PID、反馈角速度和实际反馈电流。其返回值为增量加速度前馈电流，由应用纳入总电流请求。
 
-更新依赖有效动态激励、模型质量与惯量范围，增益按较慢节奏受限变化。DOB/积分仍处理摩擦和剩余负载；不能再把辨识模型中的全部负载重复叠加为补偿。
+更新检查动态激励、模型质量与惯量范围，增益缓慢受限变化；摩擦和剩余负载由积分/DOB 处理。
 
-启用 `optimize` 时，应用或恢复参数会记录已验证增益相对模型设计值的比例；正常自适应保留该比例，避免把性能优化结果逐渐覆盖回原设计值。运行自适应仍只做慢速模型更新，不重复主动测试轨迹。
+启用 `optimize` 时，自适应保留已验证增益相对模型设计值的比例，不重复主动测试轨迹。
 
 保存模型、设计自然频率和控制参数后，可用 `AutotuneRestore()` 接入已经验证的模型及运行对象。该函数不读写 Flash，持久化由应用实现。
-
-算法实现可独立编译和仿真；最终增益、内环近似、负载变化及结构共振仍需用对应机构的数据验证。
 
 ## 方法来源
 
 - [SIFt-RLS: Subspace of Information Forgetting Recursive Least Squares](https://arxiv.org/html/2404.10844v1)，2024：当前按单条标量观测实现四维信息子空间遗忘。
 - [DiffTune+](https://proceedings.mlr.press/v211/cheng23b.html)，L4DC 2023：当前借鉴低维敏感度传播及沿梯度二次预测步长，使用本工程的 PI、损失函数和增益边界。
+- [WPILib SysId测试流程](https://docs.wpilib.org/en/stable/docs/software/advanced-controls/system-identification/creating-routine.html)：参考准静态与动态分段测试。
+- [机器人动力学工具变量辨识](https://doi.org/10.1109/TCST.2013.2246163)：离线实现采用线性两阶段最小二乘对照，未移植完整机器人辨识方法。
+- [闭环多正弦辨识研究](https://doi.org/10.1016/j.conengprac.2025.106457)：参考闭环外部激励与频率分析，当前只实现参考生成和频域比值。
+- [Noisy Multi-Objective Bayesian Optimization](https://arxiv.org/abs/2105.08195)：离线工具采用有限候选池、单点后验采样的简化对照。

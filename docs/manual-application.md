@@ -1,8 +1,25 @@
 # 应用开发
 
+## 工程结构
+
+`Core/` 保存 CubeMX 生成的启动与外设代码，`Drivers/`、`Middlewares/` 提供 HAL、CMSIS-DSP 和 FreeRTOS。Skywalker 分为四层：
+
+| 层 | 职责 |
+| --- | --- |
+| BSP | UART、FDCAN、SPI、流缓存、DMA 与计时封装 |
+| Device | 电机、遥控器和 IMU 的反馈解析、状态与指令 |
+| Algorithm | 通用控制、估计、滤波、运动学及辨识算法 |
+| Application | 设备配置、通信协议、任务与机器人控制逻辑 |
+
+Device 使用 BSP 通信，也可组合算法；Application 组织设备和控制流程。通用算法不依赖设备型号或应用协议。
+
+启动顺序为外设初始化、内核初始化、`AppConfigInit()`、创建任务、启动调度器，随后执行各任务的 `TaskInit()` 和 `TaskLoop()`。`app_task.c` 用 `osDelayUntil()` 周期调度，当前 RTOS tick 为 1 ms。
+
+常规开发修改 `app_config.h/.c`、`app_robot.c`、`app_protocol.h/.c`，机构复杂时可拆分应用文件。裁判系统解析位于 `app_referee.h/.c`。当前 `AppConfigInit()` 初始化默认关闭的调试记录器；四个任务循环为空，实际设备、控制逻辑和通信接收回调仍需由应用接入。
+
 ## 1. 配置外设与机构
 
-通过 `h7_framework.ioc` 配置引脚、时钟、CAN、UART、SPI 和任务资源。在 `app_config.h/.c` 中定义板卡角色、控制来源、任务周期和机构参数，并声明需要共享的设备对象。
+通过 `h7_framework.ioc` 配置引脚、时钟、CAN、UART 和 SPI。在 `app_config.h/.c` 中定义板卡角色、控制来源、任务周期和机构参数，并声明需要共享的设备对象。
 
 普通自定义串口优先使用 UART1、UART7、UART10；UART2/3 用于 RS485，UART5 用于 DT7，按实际硬件用途分配。仅填写串口句柄不会自动注册接收回调。
 
@@ -57,7 +74,7 @@ void ShootTaskLoop(void);
 → 电流限幅/功率分配 → 发送 → 执行量跟踪
 ```
 
-控制器与滤波器通过 C 对象和函数自由组合。目标、反馈和限幅需对应同一坐标与单位。PID 的 `output_max` 必须为正；`integral_max` 限制误差积分，积分输出预算为 `Ki * integral_max`。
+控制器与滤波器通过 C 对象和函数自由组合。目标、反馈和限幅需对应同一坐标与单位。PID 的 `output_max` 必须为正；`integral_max` 限制误差积分，积分输出预算为 $K_i\cdot\text{integral\_max}$。
 
 ### 舵轮驱动速度修正
 
@@ -81,6 +98,8 @@ SteerSpeedCorrect(&chassis.state, angle, angle_scale, drive_speed);
 
 单板可在四个任务中实现各机构；双板分别配置云台板和底盘板，使用协议传递所需目标与状态。`AppBoardRole` 和 `AppControlSource` 不包含自动切换逻辑，切换规则在任务业务中实现。
 
+状态枚举、转移条件和进入/退出动作按机器人在应用层定义。底盘、云台和发射机构可以分别持有状态，通过目标和反馈协调；框架不要求统一状态树或事件队列。模式切换时的参考重建及控制器交接由应用负责。
+
 ## 3. 定义通信协议
 
 在 `app_protocol.h` 定义消息结构和公共接口，在 `app_protocol.c` 实现帧同步、校验、字段解析及发送。
@@ -89,26 +108,14 @@ SteerSpeedCorrect(&chassis.state, angle, angle_scale, drive_speed);
 
 可使用 `bsp_stream.h` 处理分包/粘包，使用 `alg_crc.h` 校验。板间消息、调试观测和整定命令均由应用按需求定义。
 
-## 常用 C 接口
+裁判系统通过 `RefereePackFrame()` 打包，或通过 `RefereeSend()` 打包并提交 UART DMA 发送。`RefereeSend()` 返回 `true` 表示已提交，不表示传输已完成；串口忙或提交失败时返回 `false`，后续发送时机由应用安排。
 
-| 功能 | 头文件 |
-| --- | --- |
-| 电机 | `dev_dji_motor.h`、`dev_dm_motor.h`、`dev_lk_motor.h` |
-| PID 与扰动补偿 | `alg_pid.h`、`alg_dob.h` |
-| IMU 与滤波 | `dev_bmi088.h`、`alg_lpf.h`、`alg_notch.h`、`alg_imu_ekf.h` |
-| 三构型运动学 | `alg_kinetics.h` |
-| 轨迹、舵轮约束/轮速修正、轮速估计及功率模型 | `alg_motion.h` |
-| 辨识、整定与PI性能优化 | `alg_sysid.h`、`alg_autotune.h`、`alg_motor_tune.h`、`alg_pid_tune.h` |
-| UART/CAN、流缓存 | `bsp_uart.h`、`bsp_fdcan.h`、`bsp_stream.h` |
-| 实际用时测量 | `bsp_profile.h` |
+## 4. 编译与测量
 
-性能测量先调用 `ProfileInit()`、`ProfileReset()`，再用 `ProfileBegin()`/`ProfileEnd()` 包围待测代码。结果为 CPU 周期，包含期间的中断和任务抢占，单次测量应短于 32 位计数器回绕周期。
+根目录 `CMakeLists.txt` 递归收集 Skywalker 各层 `Src/` 下的 C 文件，包含各层 `Inc/`。新增或删除源文件后，下次构建会自动重新配置 CMake；替换应用时确保每组任务只有一份强定义。
 
-## 构建与验证
+编译命令及工具链见[README](../README.md#编译)。Debug 和 Release 输出分别位于 `build/Debug/`、`build/Release/`。
 
-```sh
-cmake --preset Debug
-cmake --build --preset Debug
-```
+测量用时使用 `bsp_profile.h`：先调用 `ProfileInit()`、`ProfileReset()`，再用 `ProfileBegin()`/`ProfileEnd()` 包围待测代码。结果为 CPU 周期，包含期间的中断和任务抢占；单次测量应短于 32 位计数器回绕周期。
 
-默认任务循环为空，配置中的机械参数也为占位值。实现机构逻辑后，核对反馈方向、限幅、坐标和周期，再通过对应机构验证控制参数。整定的调用顺序见 [自动整定与辨识](autotune.md)。
+控制算法见[算法说明](algorithms.md)，整定调用见[自动整定与辨识](autotune.md)。
