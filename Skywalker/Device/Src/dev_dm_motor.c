@@ -2,24 +2,44 @@
 
 #include <string.h>
 
-/**
- * @brief 将浮点数限制在指定范围内
- * @param value 输入值
- * @param min 最小值
- * @param max 最大值
- * @return 限幅后的数值
- */
-static float DmMotorClamp(float value, float min, float max)
+#include "alg_conversion.h"
+#include "stm32h7xx_hal.h"
+
+static bool DmMotorGuardEnableHook(void *device_ptr)
 {
-  if (value > max)
+  DmMotor *motor = (DmMotor *)device_ptr;
+  if (motor == NULL)
   {
-    return max;
+    return false;
   }
-  if (value < min)
+  motor->state.is_enabled = true;
+  return true;
+}
+
+static void DmMotorGuardDisableHook(void *device_ptr)
+{
+  DmMotor *motor = (DmMotor *)device_ptr;
+  if (motor == NULL)
   {
-    return min;
+    return;
   }
-  return value;
+  motor->state.is_enabled = false;
+  motor->state.given_torque = 0.0f;
+  motor->state.kp = 0.0f;
+  motor->state.kd = 0.0f;
+}
+
+static void DmMotorGuardResyncHook(void *device_ptr)
+{
+  DmMotor *motor = (DmMotor *)device_ptr;
+  if (motor == NULL)
+  {
+    return;
+  }
+  motor->state.is_enabled = false;
+  motor->state.given_torque = 0.0f;
+  motor->state.kp = 0.0f;
+  motor->state.kd = 0.0f;
 }
 
 /**
@@ -33,7 +53,7 @@ static float DmMotorClamp(float value, float min, float max)
 static uint16_t DmMotorFloatToUint(float value, float min, float max,
                                    uint8_t bits)
 {
-  value = DmMotorClamp(value, min, max);
+  value = MathClamp(value, min, max);
   float span = max - min;
   uint32_t max_int = (1UL << bits) - 1UL;
   return (uint16_t)((value - min) * (float)max_int / span);
@@ -81,7 +101,7 @@ static void DmMotorPackFloat(float value, uint8_t tx_data[4])
  */
 float DmMotorTorqueToCurrentUnits(float torque_nm)
 {
-  float torque = DmMotorClamp(torque_nm, kDmMotorTorqueMin, kDmMotorTorqueMax);
+  float torque = MathClamp(torque_nm, kDmMotorTorqueMin, kDmMotorTorqueMax);
   return torque * kDmMotorCurrentUnitsMax / kDmMotorTorqueMax;
 }
 
@@ -92,8 +112,8 @@ float DmMotorTorqueToCurrentUnits(float torque_nm)
  */
 float DmMotorCurrentUnitsToTorque(float current_units)
 {
-  float current = DmMotorClamp(current_units, -kDmMotorCurrentUnitsMax,
-                               kDmMotorCurrentUnitsMax);
+  float current = MathClamp(current_units, -kDmMotorCurrentUnitsMax,
+                            kDmMotorCurrentUnitsMax);
   return current * kDmMotorTorqueMax / kDmMotorCurrentUnitsMax;
 }
 
@@ -144,6 +164,17 @@ void DmMotorInit(DmMotor *motor, DmMotorType type, DmMotorMode mode,
     motor->limits.velocity_max = kDmMotorJ8009PVelocityMax;
     motor->limits.torque_max = kDmMotorJ8009PTorqueMax;
   }
+
+  PeripheralOps ops = {
+      .on_enable = DmMotorGuardEnableHook,
+      .on_disable = DmMotorGuardDisableHook,
+      .on_offline = DmMotorGuardDisableHook,
+      .on_resync = DmMotorGuardResyncHook,
+      .on_clear_fault = NULL,
+      .on_reconnect_probe = NULL,
+  };
+  PeripheralGuardInit(&motor->guard, "dm_motor", kPeripheralTypeMotorDm,
+                      kPeripheralDefaultTimeoutMotorMs, motor, &ops);
 }
 
 /**
@@ -174,6 +205,19 @@ void DmMotorUpdate(DmMotor *motor, const uint8_t rx_data[8])
                                            motor->limits.torque_max, 12);
   motor->state.temperature_mos = (float)rx_data[6];
   motor->state.temperature_rotor = (float)rx_data[7];
+
+  // 刷新通信心跳
+  PeripheralGuardFeed(&motor->guard, HAL_GetTick());
+
+  // 硬件错误码联动状态机（达妙协议：0=失能，1=使能，>=0x08 为过压/欠压/过流/过温等硬件故障）
+  if (motor->state.error_code >= 0x08U)
+  {
+    PeripheralGuardTriggerFault(&motor->guard, motor->state.error_code);
+  }
+  else if (PeripheralIsFault(&motor->guard))
+  {
+    PeripheralGuardClearFault(&motor->guard);
+  }
 }
 
 /**
@@ -195,11 +239,11 @@ void DmMotorPackCommand(DmMotor *motor, DmMotorCommand command,
 
   if (command == kDmMotorCommandEnable)
   {
-    motor->state.is_enabled = true;
+    (void)PeripheralGuardEnable(&motor->guard);
   }
   else if (command == kDmMotorCommandDisable)
   {
-    motor->state.is_enabled = false;
+    (void)PeripheralGuardDisable(&motor->guard);
   }
 }
 
@@ -255,27 +299,37 @@ void DmMotorPackMit(const DmMotor *motor, uint8_t tx_data[8])
     return;
   }
 
+  float given_torque = motor->state.given_torque;
+  float kp = motor->state.kp;
+  float kd = motor->state.kd;
+  if (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard))
+  {
+    given_torque = 0.0f;
+    kp = 0.0f;
+    kd = 0.0f;
+  }
+
   uint16_t position =
       DmMotorFloatToUint(motor->state.given_angle, -motor->limits.position_max,
                          motor->limits.position_max, 16);
   uint16_t velocity =
       DmMotorFloatToUint(motor->state.given_omega, -motor->limits.velocity_max,
                          motor->limits.velocity_max, 12);
-  uint16_t kp =
-      DmMotorFloatToUint(motor->state.kp, kDmMotorKpMin, kDmMotorKpMax, 12);
-  uint16_t kd =
-      DmMotorFloatToUint(motor->state.kd, kDmMotorKdMin, kDmMotorKdMax, 12);
+  uint16_t kp_uint =
+      DmMotorFloatToUint(kp, kDmMotorKpMin, kDmMotorKpMax, 12);
+  uint16_t kd_uint =
+      DmMotorFloatToUint(kd, kDmMotorKdMin, kDmMotorKdMax, 12);
   uint16_t torque =
-      DmMotorFloatToUint(motor->state.given_torque, -motor->limits.torque_max,
+      DmMotorFloatToUint(given_torque, -motor->limits.torque_max,
                          motor->limits.torque_max, 12);
 
   tx_data[0] = (uint8_t)(position >> 8);
   tx_data[1] = (uint8_t)(position & 0xFFU);
   tx_data[2] = (uint8_t)(velocity >> 4);
-  tx_data[3] = (uint8_t)(((velocity & 0x0FU) << 4) | (kp >> 8));
-  tx_data[4] = (uint8_t)(kp & 0xFFU);
-  tx_data[5] = (uint8_t)(kd >> 4);
-  tx_data[6] = (uint8_t)(((kd & 0x0FU) << 4) | (torque >> 8));
+  tx_data[3] = (uint8_t)(((velocity & 0x0FU) << 4) | (kp_uint >> 8));
+  tx_data[4] = (uint8_t)(kp_uint & 0xFFU);
+  tx_data[5] = (uint8_t)(kd_uint >> 4);
+  tx_data[6] = (uint8_t)(((kd_uint & 0x0FU) << 4) | (torque >> 8));
   tx_data[7] = (uint8_t)(torque & 0xFFU);
 }
 
@@ -291,8 +345,16 @@ void DmMotorPackPositionVelocity(const DmMotor *motor, uint8_t tx_data[8])
     return;
   }
 
-  DmMotorPackFloat(motor->state.given_angle, &tx_data[0]);
-  DmMotorPackFloat(motor->state.given_omega, &tx_data[4]);
+  float angle = motor->state.given_angle;
+  float omega = motor->state.given_omega;
+  if (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard))
+  {
+    angle = motor->state.angle;
+    omega = 0.0f;
+  }
+
+  DmMotorPackFloat(angle, &tx_data[0]);
+  DmMotorPackFloat(omega, &tx_data[4]);
 }
 
 /**
@@ -307,7 +369,10 @@ void DmMotorPackVelocity(const DmMotor *motor, uint8_t tx_data[8])
     return;
   }
 
-  DmMotorPackFloat(motor->state.given_omega, &tx_data[0]);
+  float omega = (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard))
+                    ? 0.0f
+                    : motor->state.given_omega;
+  DmMotorPackFloat(omega, &tx_data[0]);
   memset(&tx_data[4], 0, 4);
 }
 
@@ -323,9 +388,19 @@ void DmMotorPackForcePosition(const DmMotor *motor, uint8_t tx_data[8])
     return;
   }
 
-  DmMotorPackFloat(motor->state.given_angle, &tx_data[0]);
-  tx_data[4] = (uint8_t)(motor->state.velocity_limit & 0xFFU);
-  tx_data[5] = (uint8_t)(motor->state.velocity_limit >> 8);
-  tx_data[6] = (uint8_t)(motor->state.current_limit & 0xFFU);
-  tx_data[7] = (uint8_t)(motor->state.current_limit >> 8);
+  float angle = motor->state.given_angle;
+  uint16_t velocity_limit = motor->state.velocity_limit;
+  uint16_t current_limit = motor->state.current_limit;
+  if (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard))
+  {
+    angle = motor->state.angle;
+    velocity_limit = 0U;
+    current_limit = 0U;
+  }
+
+  DmMotorPackFloat(angle, &tx_data[0]);
+  tx_data[4] = (uint8_t)(velocity_limit & 0xFFU);
+  tx_data[5] = (uint8_t)(velocity_limit >> 8);
+  tx_data[6] = (uint8_t)(current_limit & 0xFFU);
+  tx_data[7] = (uint8_t)(current_limit >> 8);
 }

@@ -689,18 +689,23 @@ Bmi088Status Bmi088Init(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi)
   bmi088->motion_accel_lpf = kBmi088DefaultMotionAccelLpf;
   Bmi088ImuSetInstallMatrix(bmi088, NULL);
 
+  PeripheralGuardInit(&bmi088->guard, "bmi088", kPeripheralTypeImu,
+                      kPeripheralDefaultTimeoutImuMs, bmi088, NULL);
+
   Bmi088AccelDeselect();
   Bmi088GyroDeselect();
 
   bmi088->status = Bmi088InitAccel(hspi);
   if (bmi088->status != kBmi088NoError)
   {
+    PeripheralGuardTriggerFault(&bmi088->guard, (uint32_t)bmi088->status);
     return bmi088->status;
   }
 
   bmi088->status = Bmi088InitGyro(hspi);
   if (bmi088->status != kBmi088NoError)
   {
+    PeripheralGuardTriggerFault(&bmi088->guard, (uint32_t)bmi088->status);
     return bmi088->status;
   }
 
@@ -725,11 +730,13 @@ Bmi088Status Bmi088Update(Bmi088Object *bmi088)
   if (!Bmi088ReadRawGyro(bmi088))
   {
     bmi088->status = kBmi088NoSensor;
+    PeripheralGuardTriggerFault(&bmi088->guard, (uint32_t)bmi088->status);
     return bmi088->status;
   }
   Bmi088UpdateScaledData(bmi088);
   Bmi088UpdateCorrectedData(bmi088);
 
+  PeripheralGuardFeed(&bmi088->guard, HAL_GetTick());
   return kBmi088NoError;
 }
 
@@ -757,6 +764,7 @@ Bmi088Status Bmi088ImuInit(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi,
   if (ImuEkfInit(&bmi088->imu_ekf, config->dt, config->gravity) != 0)
   {
     bmi088->status = kBmi088ImuEkfInitError;
+    PeripheralGuardTriggerFault(&bmi088->guard, (uint32_t)bmi088->status);
     return bmi088->status;
   }
   ImuEkfSetQr(&bmi088->imu_ekf, config->q_diag, config->r_diag);
@@ -769,6 +777,7 @@ Bmi088Status Bmi088ImuInit(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi,
 
   if (config->is_auto_calibrate_enabled)
   {
+    PeripheralGuardNotifyProbingPassed(&bmi088->guard);
     uint16_t sample_count = (config->calibration_sample_count > 0U)
                                 ? config->calibration_sample_count
                                 : 600U;
@@ -784,8 +793,14 @@ Bmi088Status Bmi088ImuInit(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi,
     if (status != kBmi088NoError)
     {
       bmi088->status = status;
+      PeripheralGuardTriggerFault(&bmi088->guard, (uint32_t)status);
       return status;
     }
+    PeripheralGuardNotifyCalibrated(&bmi088->guard);
+  }
+  else
+  {
+    PeripheralGuardNotifyCalibrated(&bmi088->guard);
   }
 
   if (config->is_init_euler_from_accel_enabled)
@@ -802,6 +817,7 @@ Bmi088Status Bmi088ImuInit(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi,
     if (config->heater_htim == NULL || config->heater_pid_config == NULL)
     {
       bmi088->status = kBmi088HeaterConfigError;
+      PeripheralGuardTriggerFault(&bmi088->guard, (uint32_t)bmi088->status);
       return bmi088->status;
     }
     Bmi088HeaterInit(bmi088, config->heater_htim, config->heater_channel,
@@ -810,6 +826,7 @@ Bmi088Status Bmi088ImuInit(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi,
   }
 
   bmi088->status = kBmi088NoError;
+  PeripheralGuardEnable(&bmi088->guard);
   return bmi088->status;
 }
 
@@ -842,6 +859,7 @@ Bmi088Status Bmi088ImuUpdate(Bmi088Object *bmi088)
   if (bmi088->imu_ekf_status != ARM_MATH_SUCCESS)
   {
     bmi088->status = kBmi088ImuEkfUpdateError;
+    PeripheralGuardTriggerFault(&bmi088->guard, (uint32_t)bmi088->status);
     return bmi088->status;
   }
 

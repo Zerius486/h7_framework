@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "alg_crc.h"
+#include "stm32h7xx_hal.h"
 
 RefereeObject g_referee = {0};
 
@@ -54,6 +55,8 @@ static void RefereeQueuePush(RefereeObject *referee, const uint8_t *frame,
   RefereePacket *packet = &referee->queue.packets[referee->queue.tail];
   memcpy(packet->buffer, frame, frame_length);
   packet->length = frame_length;
+  // 确保数据包内容写入完成后再发布 tail 索引，保证 SPSC 无锁队列并发可见性
+  __DMB();
   referee->queue.tail =
       (uint16_t)((referee->queue.tail + 1U) % kRefereeQueueSize);
 }
@@ -110,6 +113,8 @@ void RefereeInit(RefereeObject *referee, UART_HandleTypeDef *rx_huart,
   referee->tx_huart = tx_huart;
   StreamBufferInit(&referee->rx_stream_buffer, referee->rx_stream,
                    sizeof(referee->rx_stream));
+  PeripheralGuardInit(&referee->guard, "referee", kPeripheralTypeReferee,
+                      kPeripheralDefaultTimeoutRefereeMs, referee, NULL);
 
   if (referee == &g_referee && rx_huart != NULL)
   {
@@ -168,6 +173,7 @@ void RefereeRxCallback(RefereeObject *referee, uint8_t *rx_buffer,
     {
       RefereeQueuePush(referee, frame, frame_length);
       referee->received_frame_count++;
+      PeripheralGuardFeed(&referee->guard, HAL_GetTick());
     }
     else
     {
@@ -204,20 +210,11 @@ void RefereeUpdate(RefereeObject *referee)
 
   while (referee->queue.head != referee->queue.tail)
   {
-    RefereePacket packet;
-    uint32_t primask = __get_PRIMASK();
-    __disable_irq();
-    packet = referee->queue.packets[referee->queue.head];
-    referee->queue.head =
-        (uint16_t)((referee->queue.head + 1U) % kRefereeQueueSize);
-    if (primask == 0U)
-    {
-      __enable_irq();
-    }
-
-    uint16_t data_length = RefereeFrameDataLength(packet.buffer);
-    uint16_t cmd_id = RefereeFrameCommandId(packet.buffer);
-    const uint8_t *data = &packet.buffer[kRefereeDataOffset];
+    // 采用零拷贝指针读取已就绪帧，避免在任务栈上分配大结构体
+    const RefereePacket *packet = &referee->queue.packets[referee->queue.head];
+    uint16_t data_length = RefereeFrameDataLength(packet->buffer);
+    uint16_t cmd_id = RefereeFrameCommandId(packet->buffer);
+    const uint8_t *data = &packet->buffer[kRefereeDataOffset];
 
     switch ((RefereeCommandId)cmd_id)
     {
@@ -294,6 +291,12 @@ void RefereeUpdate(RefereeObject *referee)
     default:
       break;
     }
+
+    // 确保在推进 head 释放槽位前，所有对 packet 的读取均已完成
+    __DMB();
+    // 解析完成后单步推进head索引，SPSC无锁环形队列保证中断与任务并发安全
+    referee->queue.head =
+        (uint16_t)((referee->queue.head + 1U) % kRefereeQueueSize);
   }
 }
 

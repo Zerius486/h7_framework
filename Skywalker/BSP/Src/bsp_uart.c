@@ -6,8 +6,9 @@
 #include "stm32h7xx_hal.h"
 #include "usart.h"
 
-// UART对象实例
-UartObject g_uart_object[kUartNbr] = {0};
+// UART对象实例，放置于.dma_buffer段并按32字节对齐，保证Cortex-M7 Cache一致性
+UartObject g_uart_object[kUartNbr]
+    __attribute__((section(".dma_buffer"), aligned(32))) = {0};
 
 /**
  * @brief 获取UART对象实例索引

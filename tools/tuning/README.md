@@ -2,11 +2,11 @@
 
 PC 工具用于保存 UART 调试流、分析时序记录及生成候选建议。电机测试和实时控制在 H7 上执行，固件不依赖 Python。
 
-需要 Python 3.10 或更新版本及 NumPy。在工程根目录执行：
+需要 Python 3.10 或更新版本，Python 环境通过根目录 [pyproject.toml](../../pyproject.toml) 与 `uv` 统一管理（使用 `.venv` 隔离，不污染系统环境）。在工程根目录执行：
 
 ```sh
-python -m pip install -r tools/tuning/requirements.txt
-python tools/tuning/tune.py --help
+uv sync
+uv run python tools/tuning/tune.py --help
 ```
 
 | 命令 | 输入 | 输出 |
@@ -21,7 +21,7 @@ python tools/tuning/tune.py --help
 
 ### 板端配置与接线
 
-采集器依赖 `pyserial`，已包含在 `requirements.txt` 中。固件默认调试 UART 为 UART7（921600 baud）。需要记录时，在 `app_config.c` 将 `g_app_debug_log_config.enabled` 改为 `true`，并用 USB-UART 适配器连接板端 TX、GND 与 PC。UART 引脚和电平按板卡原理图确认；采集端口须与电脑实际枚举的串口一致。
+采集器依赖 `pyserial`，已声明在根目录 `pyproject.toml` 中。固件默认调试 UART 为 UART7（921600 baud）。需要记录时，在 `app_config.c` 将 `g_app_debug_log_config.enabled` 改为 `true`，并用 USB-UART 适配器连接板端 TX、GND 与 PC。UART 引脚和电平按板卡原理图确认；采集端口须与电脑实际枚举的串口一致。
 
 `AppConfigInit()` 已初始化记录器。更换 UART 时，`.huart` 和 `.baudrate` 必须与 CubeMX 初始化一致；日志发送使用该 UART 的 DMA。通道默认关闭，不发送调试帧。开启后，记录器仅在运行记录期间发送数据。
 
@@ -55,7 +55,7 @@ AppTuneLogMotorTune(&motor_tune, HAL_GetTick(), position, omega,
 采集端启动如下。Windows 使用实际枚举的 `COM` 端口；Linux 将 `COM7` 替换为实际串口路径，例如 `/dev/ttyUSB0`：
 
 ```sh
-python tools/tuning/collect.py COM7 --baudrate 921600 --output records/bench-20261027-001 --duration 120 --metadata tools/tuning/collect.example.json
+uv run python tools/tuning/collect.py COM7 --baudrate 921600 --output records/bench-20261027-001 --duration 120 --metadata tools/tuning/collect.example.json
 ```
 
 先启动采集器，再开始板端试验。`--duration 0` 会持续采集到 `Ctrl-C`。输出目录必须不存在，避免覆盖已有实验；每次试验使用新的目录：
@@ -109,7 +109,7 @@ time_ms,speed_rad_s,actual_current_a
 ## 窗口、延迟与工具变量对照
 
 ```sh
-python tools/tuning/tune.py identify motor.csv --min-speed 0.16 --windows 0.01 0.02 0.04 --delays 0 2 --output comparison.json
+uv run python tools/tuning/tune.py identify motor.csv --min-speed 0.16 --windows 0.01 0.02 0.04 --delays 0 2 --output comparison.json
 ```
 
 默认用前65%数据拟合，后35%检验，可用`--split`修改。每种窗口和延迟单独报告约束最小二乘、工具变量两阶段最小二乘的参数、物理性、电流拟合度与速度自由预测误差。离线电流拟合度使用验证段积分电流去均值后的能量作分母，与板端`fitness`的分母不同。工具变量由外部参考及其延迟生成，用SVD去除共线工具，再对投影后的方程枚举阻尼、摩擦非负约束。没有`reference`或投影后秩不足时，会报告不可用。
@@ -123,7 +123,7 @@ python tools/tuning/tune.py identify motor.csv --min-speed 0.16 --windows 0.01 0
 板端使用`alg_multisine`生成速度或位置参考，原有控制器继续闭环运行。保存相同采样时刻的实际电流、速度和外部参考，第一行对应第一个过渡周期的第0点：
 
 ```sh
-python tools/tuning/tune.py frequency multisine.csv --period-ticks 1000 --harmonics 1 3 7 13 --settling-periods 2 --output response.json
+uv run python tools/tuning/tune.py frequency multisine.csv --period-ticks 1000 --harmonics 1 3 7 13 --settling-periods 2 --output response.json
 ```
 
 周期长度取`MultisineObject.period_ticks`，不能用未量化的设定频率反算。脚本只取完整周期，至少两个测量周期。限幅周期须通过`limited`明确标记。
@@ -150,7 +150,7 @@ $$
 记录全部试验，包括不满足性能约束的候选。相同参数的重复试验逐行保留。`theta`顺序固定为$[\omega_n,\zeta,k_{\mathrm{ff}}]$，指标含义与`MotorTuneMetrics`一致。模型辨识失败、没有完整指标的试验保留在原始档案中，不作为数值训练样本。
 
 ```sh
-python tools/tuning/tune.py propose search.json trials.jsonl --output next.json
+uv run python tools/tuning/tune.py propose search.json trials.jsonl --output next.json
 ```
 
 初始点不足时做空间填充；随后用固定长度尺度 Matérn 5/2 高斯过程，联合采样已测点与候选的后验，估计满足约束时的含噪声超体积增益。目标各自归一化。实现为有限候选池中的单点近似，未采用完整 BoTorch qNEHVI 及其超参数推断；没有采样到增益时返回空间探索点。
@@ -162,7 +162,7 @@ python tools/tuning/tune.py propose search.json trials.jsonl --output next.json
 ## 在实测候选表中回放
 
 ```sh
-python tools/tuning/tune.py replay search.json trials.jsonl --budget 8 --output replay.json
+uv run python tools/tuning/tune.py replay search.json trials.jsonl --budget 8 --output replay.json
 ```
 
 在已完整测过的有限候选表内，比较记录顺序、固定随机顺序和贝叶斯选择顺序。只有选中一组参数后，才向该策略暴露其搜索指标。独立`confirmation`只用于报告，输出每步的确认超体积。缺少最终确认数据时不报告算法胜负；没有原始网格数据时，记录顺序也不能称为网格基线。一次固定随机次序只提供可复现对照，不能代表统计优势。

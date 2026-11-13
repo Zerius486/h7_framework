@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "alg_pid.h"
+#include "dev_peripheral.h"
 
 // DJI电机电流值限幅（单位值，原始CAN数据范围）
 enum
@@ -58,9 +59,10 @@ typedef enum
 // DJI电机对象结构体
 typedef struct
 {
-  DjiMotorState state; // 电机状态
-  DjiMotorType type;   // 电机类型
-  DjiMotorMode mode;   // 控制模式
+  DjiMotorState state;    // 电机状态
+  DjiMotorType type;      // 电机类型
+  DjiMotorMode mode;      // 控制模式
+  PeripheralGuard guard;  // 统一外设生命周期守护对象
 } DjiMotor;
 
 // API函数声明
@@ -68,6 +70,8 @@ float DjiMotorCurrentUnitsToAmperes(DjiMotorType type, int16_t current_units);
 int16_t DjiMotorCurrentAmperesToUnits(DjiMotorType type, float current_a);
 void DjiMotorInit(DjiMotor *motor, DjiMotorType type, DjiMotorMode mode,
                   PidConfig *speed_pid_config, PidConfig *position_pid_config);
+bool DjiMotorEnable(DjiMotor *motor);
+void DjiMotorDisable(DjiMotor *motor);
 void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data);
 void DjiMotorCurrentCalculate(DjiMotor *motor);
 void DjiMotorCurrentCalculateWithFeedback(DjiMotor *motor,

@@ -6,6 +6,7 @@
 
 #include "alg_imu_ekf.h"
 #include "alg_pid.h"
+#include "dev_peripheral.h"
 #include "stm32h7xx_hal.h"
 
 // BMI088初始化和运行状态
@@ -130,6 +131,7 @@ typedef struct
   float heater_target_temperature; // 目标温度（℃）
   float heater_duty_ratio;         // 最近一次恒温控制占空比
   bool is_heater_enabled;          // 恒温控制使能标志
+  PeripheralGuard guard;           // 统一外设生命周期守护对象
 } Bmi088Object;
 
 extern Bmi088Object g_bmi088;

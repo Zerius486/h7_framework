@@ -5,4 +5,4 @@ ColumnLimit: 80
 BreakBeforeBraces: Allman
 SortIncludes: Never
 AllowShortFunctionsOnASingleLine: None
-ReflowComments: Never
+ReflowComments: false

@@ -11,6 +11,8 @@
 #include "app_task.h"
 
 #include "app_config.h"
+#include "dev_peripheral.h"
+#include "stm32h7xx_hal.h"
 
 /**
  * @brief 初始化管理任务
@@ -18,6 +20,7 @@
  */
 uint32_t ManagerTaskInit(void)
 {
+  PeripheralManagerInit();
   return g_app_task_config.manager_period_ms;
 }
 
@@ -26,6 +29,16 @@ uint32_t ManagerTaskInit(void)
  */
 void ManagerTaskLoop(void)
 {
+  uint32_t now_tick = HAL_GetTick();
+  // 统一执行所有已登记外设的超时检测、重连探测与状态机流转
+  PeripheralManagerUpdateAll(now_tick);
+
+  // 关键外设安全联锁保护：若关键外设发生严重故障或离线超时，执行全局紧急停机归零
+  if (PeripheralManagerHasCriticalFault() ||
+      !PeripheralManagerIsAllCriticalOnline())
+  {
+    PeripheralManagerEmergencyStopAll();
+  }
 }
 
 /**

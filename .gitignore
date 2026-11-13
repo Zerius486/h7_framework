@@ -1,5 +1,6 @@
 /.vscode/
 /build/
 /.codex/
+/.venv/
 __pycache__/
 *.py[cod]

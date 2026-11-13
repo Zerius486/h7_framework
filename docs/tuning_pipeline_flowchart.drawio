@@ -1,0 +1,154 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="Electron" agent="Skywalker-Drawio-Generator" version="24.7.5">
+  <diagram id="diag_电机自动整定与系统辨识流程图" name="电机自动整定与系统辨识流程图">
+    <mxGraphModel dx="2160" dy="1250" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2160" pageHeight="1250" math="1" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title_banner" value="&lt;b&gt;Skywalker H7 电机自动整定、窗口积分辨识与帕累托寻优全流程图&lt;/b&gt;&lt;br&gt;基于 alg_sysid 窗口积分 SIFt-RLS 辨识、alg_autotune 二阶极点配置 + DiffTune+ 敏感度梯度精调与 alg_motor_tune 多目标帕累托寻优" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="35" y="14" width="2090" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_guard" value="安全边界监控、质量门控与高速遥测 (Safety &amp; Telemetry)" style="swimlane;whiteSpace=wrap;html=1;startSize=32;rounded=1;arcSize=6;fillColor=#FEF2F2;swimlaneFillColor=#FEF2F2;swimlaneHeadColor=#991B1B;strokeColor=#DC2626;strokeWidth=1.5;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="35" y="80" width="415" height="1135" as="geometry" />
+        </mxCell>
+        <mxCell id="g_limits" value="&lt;b&gt;安全边界与延迟配对配置 (AutotuneConfig)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;工作区硬限位&lt;/b&gt;：连续展开角 \(\theta \in [\theta_{\min},\, \theta_{\max}]\)&lt;br&gt;• &lt;b&gt;激励与速度限幅&lt;/b&gt;：\(|i| \le I_{\max}\)，\(|\omega| \le \omega_{\max}\)&lt;br&gt;• &lt;b&gt;闭环阶跃约束&lt;/b&gt;：最大步长 \(\Delta\theta_{\max}\)，最大允许超调 \(\sigma_{\max}\)&lt;br&gt;• &lt;b&gt;采样延迟校准&lt;/b&gt;：延迟步数 \(N\) (\(T_d = N\Delta t\)) 精确配对 \(i(k-N)\) 与 \(\omega(k)\)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#DC2626;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="58" y="130" width="370" height="175" as="geometry" />
+        </mxCell>
+        <mxCell id="g_status" value="&lt;b&gt;系统辨识质量门控 (SysidStatus / AutotuneError)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;kSysidInsufficientSamples&lt;/b&gt;：有效积分窗口样本数 \(n &lt; n_{\min}\)&lt;br&gt;• &lt;b&gt;kSysidInsufficientExcitation&lt;/b&gt;：加减速或速度激励跨度不足&lt;br&gt;• &lt;b&gt;kSysidInvalidModel&lt;/b&gt;：辨识参数非物理正定 (\(M \le 0\) 或 \(B &lt; 0\))&lt;br&gt;• &lt;b&gt;kAutotunePredictionError&lt;/b&gt;：验证集拟合优度 \(\eta_{\text{fit}} &lt; 0.75\)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="58" y="365" width="370" height="175" as="geometry" />
+        </mxCell>
+        <mxCell id="g_abort" value="&lt;b&gt;异常中止与安全回退态 (kAutotuneFailed / Cancelled)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;触发条件&lt;/b&gt;：位置越界 \(\theta \notin [\theta_{\min}, \theta_{\max}]\) (kAutotuneMotionLimit)、&lt;br&gt;  无稳定候选增益 (kAutotuneNoStableGain) 或主动调用 AutotuneCancel()&lt;br&gt;• &lt;b&gt;安全动作&lt;/b&gt;：立即切断测试电流 \(i_{\text{cmd}} = 0\)，完整回滚并保留整定前原控制器增益 \((K_p^{(0)},\, K_i^{(0)},\, K_d^{(0)})\)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FEE2E2;strokeColor=#B91C1C;strokeWidth=2.0;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="58" y="605" width="370" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="g_telemetry" value="&lt;b&gt;UART7 独立高速遥测流 (AppTuneLog，921600 bps)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;硬件通道解耦&lt;/b&gt;：专用 UART7 串口，与裁判系统 UART6 物理隔离&lt;br&gt;• &lt;b&gt;三类实时遥测报文 (1 kHz)&lt;/b&gt;：&lt;br&gt;  1. &lt;b&gt;$TUNE&lt;/b&gt;：实时角度 \(\theta\)、角速度 \(\omega\)、参考值 \(r\)、反馈 \(i\) 与指令 \(i_{\text{cmd}}\)&lt;br&gt;  2. &lt;b&gt;$SYSID&lt;/b&gt;：在线辨识参数 \((M,\, B,\, F,\, L)\) 与拟合优度 \(\eta_{\text{fit}}\)&lt;br&gt;  3. &lt;b&gt;$RESULT&lt;/b&gt;：最终三环增益、超调量 \(\sigma\%\) 与帕累托候选集汇总&lt;br&gt;• 支持上位机 Python 脚本离线复现积分回归与频响分析" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#EFF6FF;strokeColor=#1D4ED8;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="58" y="855" width="370" height="305" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_autotune" value="主线一：参数化模型辨识与三环自整定流水线 (alg_autotune + alg_sysid + alg_pid_tune)" style="swimlane;whiteSpace=wrap;html=1;startSize=32;rounded=1;arcSize=6;fillColor=#F8FAFC;swimlaneFillColor=#F8FAFC;swimlaneHeadColor=#0F172A;strokeColor=#475569;strokeWidth=1.5;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="590" y="80" width="760" height="1135" as="geometry" />
+        </mxCell>
+        <mxCell id="a_start" value="&lt;b&gt;1. 整定启动与初始姿态锁定 (kAutotuneIdle → AutotuneStart)&lt;/b&gt;&lt;br&gt;• 锁定连续展开角初始平衡点 \(\theta_0\)，重置滑动积分窗口与信息矩阵 \(R_0 = \epsilon I_4\)，由周期 \(\Delta t\) 换算延迟步数 \(N = \operatorname{round}(T_d/\Delta t)\)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F1F5F9;strokeColor=#475569;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="625" y="125" width="690" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="a_stage123" value="&lt;b&gt;2. 阶段 I–III 分段主动激励 (kAutotuneIdentify: Probe → Quasistatic → Dynamic)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;Stage I 起动探测 (kAutotuneProbe，\(\pm 0.75\,\text{s}\))&lt;/b&gt;：电流斜坡探测正反向突破静摩擦阈值 \(\omega_{\min}\) 的起动电流 \((i_{\text{start}}^{+},\, i_{\text{start}}^{-})\)&lt;br&gt;• &lt;b&gt;Stage II 准静态斜坡 (kAutotuneQuasistatic，\(\pm 1.5\,\text{s}\))&lt;/b&gt;：慢速对称斜坡充分激励粘性阻尼 \(B\) 与库仑摩擦 \(F\)&lt;br&gt;• &lt;b&gt;Stage III 动态脉冲 (kAutotuneDynamic，\(\ge 4.0\,\text{s}\))&lt;/b&gt;：变宽随机双极性电流脉冲激励高角加速度段以精确分离惯量 \(M\)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="625" y="265" width="690" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="a_rls" value="&lt;b&gt;3. 滑动窗口积分模型与在线递推辨识 (alg_sysid)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;电流坐标窗口积分方程&lt;/b&gt;（消除角速度差分噪声，其中 \(M = J/K_t,\; B = b/K_t\)）：&lt;br&gt;  \(\int i\,dt = M\,\Delta\omega + B\int \omega\,dt + F\int \operatorname{sign}(\omega)\,dt + L\,\Delta t\)&lt;br&gt;• &lt;b&gt;SIFt-RLS 定向子空间遗忘递推更新&lt;/b&gt;（支持 kSysidExponential 与 kSysidSubspace，Cholesky 求逆 \(P_k = R_k^{-1}\)）：&lt;br&gt;  \(R_{k+1} = R_k - (1-\lambda)\,\frac{(R_k \varphi_k)(R_k \varphi_k)^T}{\varphi_k^T R_k \varphi_k} + \varphi_k \varphi_k^T, \qquad \hat{\theta}_{k+1} = \hat{\theta}_k + R_{k+1}^{-1}\varphi_k\,(y_k - \varphi_k^T\hat{\theta}_k)\)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ECFDF5;strokeColor=#059669;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="625" y="460" width="690" height="175" as="geometry" />
+        </mxCell>
+        <mxCell id="a_val" value="&lt;b&gt;4. 阶段 IV 冻结模型与自由速度预测验证 (kAutotuneModelValidation，\(2.0\,\text{s}\))&lt;/b&gt;&lt;br&gt;• 冻结参数向量 \(\hat{\theta} = [M,\, B,\, F,\, L]^T\)，在 \(2.0\,\text{s}\) 独立验证轨迹上前向积分预测角速度序列 \(\hat{\omega}(k)\)&lt;br&gt;• &lt;b&gt;模型准入判据&lt;/b&gt;：归一化拟合优度 \(\eta_{\text{fit}} = 1 - \|\omega - \hat{\omega}\|_2 \,/\, \|\omega - \bar{\omega}\|_2 \ge 0.75\)（达标则置 kSysidModelReady）" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F0FDF4;strokeColor=#16A34A;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="625" y="680" width="690" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="a_speed" value="&lt;b&gt;5. 速度环极点配置初值与 DiffTune+ 敏感度精调 (kAutotuneSpeed + alg_pid_tune)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;二阶极点配置初值&lt;/b&gt;：\(K_p = \max(2\zeta\omega_n M - B,\; 0.1\omega_n M),\; K_i = M\omega_n^2\)，遍历 6 组网格 \(\omega_n \times \{1, 0.6, 1.6\},\; \zeta \in \{1.0, 1.4\}\)&lt;br&gt;• &lt;b&gt;DiffTune+ 在线敏感度优化&lt;/b&gt; (optimize=true)：在 \((\ln K_p,\, \ln K_i)\) 对数空间沿闭环轨迹敏感度梯度迭代（最多 6 轮，单步限幅 \(0.8 \sim 1.25\times\)）：&lt;br&gt;  \(\mathcal{L} = \frac{1}{N_s}\sum\left[(e_k / s_y)^2 + w_u(u_k / u_{\max})^2 + w_{\Delta u}(\Delta u_k / u_{\max})^2\right]\)，收敛后二次复核最优增益" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FEFCE8;strokeColor=#CA8A04;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="625" y="840" width="690" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="a_pos_dob" value="&lt;b&gt;6. 位置外环、扰动观测器验证与在线生效 (kAutotunePosition → kAutotuneDob → Complete)&lt;/b&gt;&lt;br&gt;• 顺序验证位置外环增益 \(K_{p,\text{pos}}\) 与一阶 Q 滤波扰动观测器 \(Q(s) = \omega_c / (s + \omega_c)\) (\(\omega_c = 2\pi f_{\text{dob}}\)) 的阶跃超调与稳态精度&lt;br&gt;• 进入 &lt;b&gt;kAutotuneComplete&lt;/b&gt;：调用 &lt;b&gt;AutotuneApply()&lt;/b&gt; 写入控制器，运行期支持 &lt;b&gt;AutotuneAdapt()&lt;/b&gt; 慢速自适应更新前馈 \((F,\, L)\)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#DCFCE7;strokeColor=#15803D;strokeWidth=2.2;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="625" y="1050" width="690" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_pareto" value="主线二：性能约束与多目标帕累托寻优扩展 (alg_motor_tune)" style="swimlane;whiteSpace=wrap;html=1;startSize=32;rounded=1;arcSize=6;fillColor=#FAF5FF;swimlaneFillColor=#FAF5FF;swimlaneHeadColor=#3B0764;strokeColor=#7E22CE;strokeWidth=1.5;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1490" y="80" width="635" height="1135" as="geometry" />
+        </mxCell>
+        <mxCell id="p_prep" value="&lt;b&gt;1. 辨识复用与回零准备 (kMotorTuneIdentify → Prepare)&lt;/b&gt;&lt;br&gt;• 复用 Autotune 完成 \((M,\, B,\, F,\, L)\) 辨识后，闭环平滑退回初始平衡角 \(\theta_0\)&lt;br&gt;• 消除辨识阶段累积位移偏差，确保后续大行程训练处于安全工作区中心" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#7E22CE;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="1520" y="130" width="575" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="p_char" value="&lt;b&gt;2. 非线性摩擦与死区精细表征 (kMotorTuneCharacterize)&lt;/b&gt;&lt;br&gt;• 自动测定正反向极低速爬行阈值 \(\omega_{\text{creep}}\)、过零换向死区 \(i_{\text{dead}}\) 与保持电流 \(i_{\text{hold}}(\theta)\)&lt;br&gt;• 提取非对称静摩擦补偿前馈与姿态相关重力偏置，改善微幅跟踪线性度" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F3E8FF;strokeColor=#7E22CE;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="1520" y="320" width="575" height="155" as="geometry" />
+        </mxCell>
+        <mxCell id="p_search" value="&lt;b&gt;3. 16 段三次样条轨迹与多候选训练 (kMotorTuneSearch)&lt;/b&gt;&lt;br&gt;• 生成 16 段连续三次样条轨迹 \(\theta_{\text{ref}}(t) = a_i + b_i\tau + c_i\tau^2 + d_i\tau^3\)（兼顾平滑加减速与多频段激励）&lt;br&gt;• 对多组候选增益与前馈组合执行敏感度迭代，同步统计跟踪误差 \(J_{\text{track}}\)、能耗 \(J_{\text{energy}}\) 与平滑度 \(J_{\text{smooth}}\)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F3E8FF;strokeColor=#6B21A8;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="1520" y="525" width="575" height="175" as="geometry" />
+        </mxCell>
+        <mxCell id="p_val" value="&lt;b&gt;4. 多幅值跨工况鲁棒性验证 (kMotorTuneValidate)&lt;/b&gt;&lt;br&gt;• 依次在 \(25\% \,/\, 40\% \,/\, 85\%\) 额定行程幅度下执行闭环轨迹考核&lt;br&gt;• 结合 &lt;b&gt;PidTrackOutput&lt;/b&gt; 抗饱和指令回传 \(u_{\text{applied}} = \operatorname{sat}(u_{\text{cmd}},\, \pm u_{\max})\)，剔除大信号饱和时振荡的候选解" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#EDE9FE;strokeColor=#5B21B6;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="1520" y="755" width="575" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="p_export" value="&lt;b&gt;5. 帕累托前沿筛选与三档配置导出 (kMotorTuneComplete)&lt;/b&gt;&lt;br&gt;• 在三维目标空间 \(\big(J_{\text{track}},\, J_{\text{energy}},\, J_{\text{smooth}}\big)\) 提取非支配帕累托前沿&lt;br&gt;• 调用 &lt;b&gt;MotorTuneExport()&lt;/b&gt; 导出三档工程参数：&lt;br&gt;  &lt;b&gt;Conservative（平稳低噪） / Balanced（均衡推荐） / Aggressive（极限响应）&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#DCFCE7;strokeColor=#15803D;strokeWidth=2.0;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="1520" y="975" width="575" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a1_a2" value="进入四阶段主动辨识" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#2563EB;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="a_start" target="a_stage123">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a2_a3" value="实时配对延迟样本 \((i,\, \omega)\)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#059669;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="a_stage123" target="a_rls">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a3_a4" value="进入 Stage IV 冻结验证" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#16A34A;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="a_rls" target="a_val">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a4_a5" value="\(\eta_{\text{fit}} \ge 0.75\) (模型就绪)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#CA8A04;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="a_val" target="a_speed">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a5_a6" value="速度环最优增益锁定" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#15803D;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="a_speed" target="a_pos_dob">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_p1_p2" value="回到初始零位 \(\theta_0\)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#7E22CE;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="p_prep" target="p_char">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_p2_p3" value="摩擦与死区表征完成" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#7E22CE;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="p_char" target="p_search">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_p3_p4" value="候选控制器训练收敛" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#5B21B6;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="p_search" target="p_val">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_p4_p5" value="\(25\% / 40\% / 85\%\) 验证通过" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#15803D;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="p_val" target="p_export">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_val_prep" value="复用辨识模型&lt;br&gt;启动 MotorTune" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#7E22CE;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="a_val" target="p_prep">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1418" y="738" />
+              <mxPoint x="1418" y="200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_exp_apply" value="MotorTuneExport()&lt;br&gt;注入选定档位参数" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.5;exitDx=0;exitDy=0;entryX=1.0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#15803D;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="p_export" target="a_pos_dob">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1418" y="1065" />
+              <mxPoint x="1418" y="1112" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_lim_start" value="注入安全边界&lt;br&gt;与延迟步数 \(N\)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.25;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#DC2626;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="g_limits" target="a_start">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="526" y="174" />
+              <mxPoint x="526" y="172" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_rls_stat" value="校验样本数 \(n\)&lt;br&gt;与激励充分性" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.35;exitDx=0;exitDy=0;entryX=1.0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#EA580C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="a_rls" target="g_status">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="526" y="521" />
+              <mxPoint x="526" y="452" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_stat_abort" value="模型无效或激励不足" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#B91C1C;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="g_status" target="g_abort">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_val_abort" value="\(\eta_{\text{fit}} &lt; 0.75\)&lt;br&gt;(预测误差超限)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.5;exitDx=0;exitDy=0;entryX=1.0;entryY=0.45;entryDx=0;entryDy=0;strokeColor=#B91C1C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="a_val" target="g_abort">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="526" y="738" />
+              <mxPoint x="526" y="686" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_spd_abort" value="位置越界或&lt;br&gt;无稳定候选增益" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.25;exitDx=0;exitDy=0;entryX=1.0;entryY=0.82;entryDx=0;entryDy=0;strokeColor=#B91C1C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="a_speed" target="g_abort">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="526" y="881" />
+              <mxPoint x="526" y="753" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_spd_tele" value="1kHz 实时遥测&lt;br&gt;$TUNE / $SYSID&lt;br&gt;/ $RESULT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.78;exitDx=0;exitDy=0;entryX=1.0;entryY=0.35;entryDx=0;entryDy=0;strokeColor=#1D4ED8;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="a_speed" target="g_telemetry">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="526" y="969" />
+              <mxPoint x="526" y="962" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -96,8 +96,9 @@ void StartChassis(void *argument)
 void StartShoot(void *argument)
 {
   (void)argument;
-  uint32_t next_wake_time = osKernelGetTickCount();
   uint32_t period_ms = AppTaskNormalizePeriod(ShootTaskInit());
+  // 须在Init完成后再采样起始时间，避免初始化耗时导致启动时osDelayUntil发生追赶
+  uint32_t next_wake_time = osKernelGetTickCount();
   for (;;)
   {
     ShootTaskLoop();

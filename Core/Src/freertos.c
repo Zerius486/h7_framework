@@ -212,6 +212,30 @@ __weak void StartShoot(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+/**
+ * @brief FreeRTOS任务栈溢出钩子函数
+ * @param xTask 触发溢出的任务句柄
+ * @param pcTaskName 触发溢出的任务名称
+ */
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+  (void)xTask;
+  (void)pcTaskName;
+  taskDISABLE_INTERRUPTS();
+  for (;;)
+  {
+  }
+}
 
+/**
+ * @brief FreeRTOS动态内存分配失败钩子函数
+ */
+void vApplicationMallocFailedHook(void)
+{
+  taskDISABLE_INTERRUPTS();
+  for (;;)
+  {
+  }
+}
 /* USER CODE END Application */
 

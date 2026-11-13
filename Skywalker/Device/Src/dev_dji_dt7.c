@@ -4,6 +4,8 @@
 
 #include "bsp_stream.h"
 #include "cmsis_os2.h"
+#include "stm32h7xx_hal.h"
+#include <string.h>
 
 enum
 {
@@ -15,6 +17,47 @@ Dt7Object g_dt7_object;
 static uint8_t g_dt7_rx_stream[18U * 4U];
 static StreamBuffer g_dt7_rx_stream_buffer;
 static bool g_dt7_rx_stream_initialized = false;
+
+static void Dt7GuardOfflineHook(void *device_ptr)
+{
+  Dt7Object *dt7 = (Dt7Object *)device_ptr;
+  if (dt7 == NULL)
+  {
+    return;
+  }
+  // 离线失联保护：摇杆归中、开关置安全位、鼠标键盘清零
+  dt7->rocker.ch0 = 0;
+  dt7->rocker.ch1 = 0;
+  dt7->rocker.ch2 = 0;
+  dt7->rocker.ch3 = 0;
+  dt7->rocker.wheel = 0;
+  dt7->rocker.sw1 = kRcSwMid;
+  dt7->rocker.sw2 = kRcSwMid;
+  dt7->mouse.x = 0;
+  dt7->mouse.y = 0;
+  dt7->mouse.z = 0;
+  dt7->mouse.l = 0;
+  dt7->mouse.r = 0;
+  memset(&dt7->key, 0, sizeof(dt7->key));
+}
+
+void Dt7Init(void)
+{
+  memset(&g_dt7_object, 0, sizeof(g_dt7_object));
+  g_dt7_object.rocker.sw1 = kRcSwMid;
+  g_dt7_object.rocker.sw2 = kRcSwMid;
+
+  PeripheralOps ops = {
+      .on_enable = NULL,
+      .on_disable = Dt7GuardOfflineHook,
+      .on_offline = Dt7GuardOfflineHook,
+      .on_resync = NULL,
+      .on_clear_fault = NULL,
+      .on_reconnect_probe = NULL,
+  };
+  PeripheralGuardInit(&g_dt7_object.guard, "dji_dt7", kPeripheralTypeRemote,
+                      kPeripheralDefaultTimeoutRemoteMs, &g_dt7_object, &ops);
+}
 
 /**
  * @brief DT7 遥控器接收回调函数，解析18字节数据包
@@ -93,6 +136,7 @@ void Dt7RxCallback(uint8_t *rx_buffer, uint16_t length)
         (int16_t)kRcChValueOffset;
     g_dt7_object.last_update_tick = osKernelGetTickCount();
     g_dt7_object.frame_count++;
+    PeripheralGuardFeed(&g_dt7_object.guard, HAL_GetTick());
     StreamBufferConsume(&g_dt7_rx_stream_buffer, kDt7FrameLength);
   }
 }

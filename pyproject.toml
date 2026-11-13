@@ -1,0 +1,14 @@
+[project]
+name = "h7-framework"
+version = "0.1.0"
+description = "Python tuning data collection and offline analysis tools for h7_framework"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pyserial>=3.5",
+]
+
+[tool.pyright]
+typeCheckingMode = "off"
+include = ["tools/tuning"]
+exclude = ["Core", "Drivers", "Middlewares", "Skywalker", "build", ".venv", "docs"]

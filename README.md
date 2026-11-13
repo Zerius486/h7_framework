@@ -37,7 +37,7 @@ GitHub Actions 工作流位于 [`.github/workflows/ci.yml`](.github/workflows/ci
 | `app_robot.c` | 管理、云台、底盘和发射任务的业务逻辑 |
 | `app_protocol.h/.c` | 应用通信消息、解析和发送 |
 
-当前 `AppConfigInit()` 只初始化调试记录器；四个任务循环为空，任务周期默认 1 ms。接入机器人时，在 `app_config.c` 填写本机配置，在 `AppConfigInit()` 初始化设备、算法与接收回调，再在 `app_robot.c` 实现任务初始化和周期逻辑。协议按机器人需要在 `app_protocol.h/.c` 实现。单板/双板分工及遥控、视觉、板间控制来源的切换由应用任务负责。
+当前 `AppConfigInit()` 只初始化调试记录器；`ManagerTask` 已接入 `PeripheralManager` 轮询与关键外设急停联锁，其余三个任务循环为空，任务周期默认 1 ms。接入机器人时，在 `app_config.c` 填写本机配置，在 `AppConfigInit()` 初始化设备、算法、接收回调并调用 `PeripheralManagerRegister()` 登记外设守护，再在 `app_robot.c` 实现任务初始化和周期逻辑。协议按机器人需要在 `app_protocol.h/.c` 实现。单板/双板分工及遥控、视觉、板间控制来源的切换由应用任务负责。
 
 应用层接口使用 SI 单位，例如角度 rad、角速度 rad/s、电流 A、速度 m/s。设备驱动完成协议数值到 SI 单位的换算；机构方向、零位和轴侧转换由应用配置。目标、反馈及限幅须使用相同坐标，算法采样周期须与调用周期相符。
 
@@ -46,11 +46,11 @@ GitHub Actions 工作流位于 [`.github/workflows/ci.yml`](.github/workflows/ci
 | 目录 | 内容 |
 | --- | --- |
 | `Skywalker/BSP/` | UART、FDCAN、SPI、流缓存、DMA、周期计时和调试日志 |
-| `Skywalker/Device/` | DJI、DM、LK 电机，DT7 遥控器和 BMI088 IMU 驱动 |
+| `Skywalker/Device/` | DJI、DM、LK 电机，DT7 遥控器、BMI088 IMU 驱动及统一外设守护状态机 |
 | `Skywalker/Algorithm/` | PID、DOB、运动学、轨迹、滤波、状态估计、辨识和整定 |
-| `Skywalker/Application/` | 机器人配置、业务任务、应用协议及整定日志适配 |
+| `Skywalker/Application/` | 机器人配置、业务任务、应用协议、裁判系统及整定日志适配 |
 
-支持 DJI M2006、M3508、GM6020，DM J4310/J8009P 和 LK 电机。GM6020 电流控制需在 RoboMaster Assistant 中启用对应模式；J8009P 的量程与接入说明见[应用开发](docs/manual-application.md#dm8009p-电机)。
+支持 DJI M2006、M3508、GM6020，DM J4310/J8009P 和 LK 电机，并内嵌 `PeripheralGuard` 使能、离线超时及故障门控。GM6020 电流控制需在 RoboMaster Assistant 中启用对应模式；J8009P 的量程与外设守护接入说明见[应用开发](docs/manual-application.md)。
 
 算法按需组合，包括 PID/DOB、滤波和状态估计、全向/麦轮/舵轮运动学、轨迹与限幅、机械模型辨识及单电机性能整定。舵轮还提供零速保持和依据实际舵角的驱动速度修正。模块说明见[算法文档](docs/algorithms.md)。
 
@@ -64,7 +64,8 @@ GitHub Actions 工作流位于 [`.github/workflows/ci.yml`](.github/workflows/ci
 
 ## 文档
 
-- [应用开发](docs/manual-application.md)：分层、初始化、设备接入、任务与通信。
+- [应用开发](docs/manual-application.md)：分层、初始化、外设守护与使能、任务与通信。
 - [算法说明](docs/algorithms.md)：算法用途、接口和组合方式。
 - [自动整定与辨识](docs/autotune.md)：模型、调用流程、性能指标和边界。
 - [整定数据采集与离线分析](tools/tuning/README.md)：串口记录器及 Python 工具。
+- 设计图表：[外设状态机设计图](docs/peripheral_state_machine.pdf)（[drawio](docs/peripheral_state_machine.drawio)）、[自动整定流程图](docs/tuning_pipeline_flowchart.pdf)（[drawio](docs/tuning_pipeline_flowchart.drawio)）。

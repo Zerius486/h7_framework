@@ -54,17 +54,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Install Python dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-venv
-          /usr/bin/python3 -m venv .venv
-          .venv/bin/python -m pip install -r tools/tuning/requirements.txt
+        run: uv sync --locked
 
       - name: Check syntax
-        run: .venv/bin/python -m compileall -q tools/tuning
+        run: uv run python -m compileall -q tools/tuning
 
       - name: Check command entry points
         run: |
-          .venv/bin/python tools/tuning/collect.py --help
-          .venv/bin/python tools/tuning/tune.py --help
+          uv run python tools/tuning/collect.py --help
+          uv run python tools/tuning/tune.py --help

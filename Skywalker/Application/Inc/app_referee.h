@@ -6,6 +6,7 @@
 
 #include "bsp_uart.h"
 #include "bsp_stream.h"
+#include "dev_peripheral.h"
 
 enum
 {
@@ -203,6 +204,7 @@ typedef struct
   uint8_t tx_sequence;                     // 发送包序号
   uint32_t received_frame_count;           // 已接收有效帧计数
   uint32_t dropped_frame_count;            // 丢弃帧计数
+  PeripheralGuard guard;                   // 统一外设生命周期守护对象
 
   // 最近一次解析出的各类裁判系统数据。
   RefereeGameState game_state;

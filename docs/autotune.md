@@ -1,6 +1,6 @@
 # 自动整定与辨识
 
-整定在 H7 上执行。应用提供采样、控制权切换、电流发送、开始/取消和结果保存。
+整定在 H7 上执行。应用提供采样、控制权切换、电流发送、开始/取消和结果保存。完整工程流程参见[自动整定流程图](tuning_pipeline_flowchart.pdf)（源文件：[tuning_pipeline_flowchart.drawio](tuning_pipeline_flowchart.drawio)）。
 
 | 需求 | 接口 |
 | --- | --- |

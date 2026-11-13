@@ -4,17 +4,7 @@
 #include <stddef.h>
 #include <string.h>
 
-/**
- * @brief 限制浮点数范围
- * @param value 输入值
- * @param lower 下限
- * @param upper 上限
- * @return 限幅后的值
- */
-static float MotorTuneClamp(float value, float lower, float upper)
-{
-  return fminf(fmaxf(value, lower), upper);
-}
+#include "alg_conversion.h"
 
 /**
  * @brief 检查物理参数搜索范围
@@ -308,7 +298,7 @@ static void MotorTunePrime(MotorTuneObject *tune, float position, float omega,
   tune->speed_pid.feedback = omega;
   tune->speed_pid.previous_reference = omega;
   tune->speed_pid.previous_feedback = omega;
-  tune->speed_pid.error_sum = MotorTuneClamp(current / tune->speed_pid.ki,
+  tune->speed_pid.error_sum = MathClamp(current / tune->speed_pid.ki,
                                              -tune->speed_pid.integral_max,
                                              tune->speed_pid.integral_max);
   tune->position_pid.reference = position;
@@ -535,7 +525,7 @@ static bool MotorTuneRefine(MotorTuneObject *tune)
       {
         float value[3] = {center[0], center[1], center[2]};
         value[d] =
-            MotorTuneClamp(center[d] + (side == 0U ? -1.0f : 1.0f) * fraction *
+            MathClamp(center[d] + (side == 0U ? -1.0f : 1.0f) * fraction *
                                            (range[d]->upper - range[d]->lower),
                            range[d]->lower, range[d]->upper);
         added = MotorTuneAdd(tune, value) || added;
@@ -909,7 +899,7 @@ float MotorTuneUpdate(MotorTuneObject *tune, float position, float omega,
   if (tune->state == kMotorTunePrepare)
   {
     tune->elapsed += dt;
-    float reference = MotorTuneClamp(
+    float reference = MathClamp(
         tune->baseline.result.position_kp * (tune->center - position),
         -0.3f * tune->speed_amplitude, 0.3f * tune->speed_amplitude);
     tune->requested_current = PidCalculate(&tune->speed_pid, reference, omega);
@@ -960,7 +950,7 @@ float MotorTuneUpdate(MotorTuneObject *tune, float position, float omega,
     }
   }
   float progress = (float)tune->tick / (float)tune->segment_ticks;
-  float blend = MotorTuneClamp(2.0f * progress, 0.0f, 1.0f);
+  float blend = MathClamp(2.0f * progress, 0.0f, 1.0f);
   blend = blend * blend * (3.0f - 2.0f * blend);
   tune->reference =
       tune->previous_target + blend * (tune->target - tune->previous_target);

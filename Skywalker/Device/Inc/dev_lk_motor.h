@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "dev_peripheral.h"
+
 enum
 {
   kLkMotorMaxGroupCount = 4,        // LK多电机电流指令最多控制4个电机
@@ -37,7 +39,8 @@ typedef struct
 // LK电机对象结构体
 typedef struct
 {
-  LkMotorState state; // 电机状态
+  LkMotorState state;    // 电机状态
+  PeripheralGuard guard; // 统一外设生命周期守护对象
 } LkMotor;
 
 // API函数声明

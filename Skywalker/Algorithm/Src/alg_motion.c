@@ -3,6 +3,8 @@
 #include <math.h>
 #include <string.h>
 
+#include "alg_conversion.h"
+
 /**
  * @brief 按上升和下降变化率更新标量目标
  * @param ramp 状态指针
@@ -16,8 +18,7 @@ float MotionRampUpdate(MotionRamp *ramp, float target, float rise_rate,
                        float fall_rate, float sampling_time)
 {
   float delta = target - ramp->value;
-  delta = fminf(fmaxf(delta, -fall_rate * sampling_time),
-                rise_rate * sampling_time);
+  delta = MathClamp(delta, -fall_rate * sampling_time, rise_rate * sampling_time);
   ramp->value += delta;
   return ramp->value;
 }
@@ -128,9 +129,8 @@ static bool SteerCandidate(const SteerSetpoint *setpoint,
   bool feasible = true;
   for (int i = 0; i < 4; i++)
   {
-    float delta = remainderf(candidate->state.wheel_angle[i] -
-                                 setpoint->wheels.wheel_angle[i],
-                             2.0f * (float)M_PI);
+    float delta = MathAngleDiff(candidate->state.wheel_angle[i],
+                                setpoint->wheels.wheel_angle[i]);
     float previous = setpoint->wheels.wheel_speed[i];
     float speed = candidate->state.wheel_speed[i];
     // 选向边界附近保留上周期轮速符号，减少反复切换。
@@ -138,11 +138,10 @@ static bool SteerCandidate(const SteerSetpoint *setpoint,
         fabsf(delta) > (float)M_PI / 2.0f - hysteresis)
     {
       candidate->state.wheel_speed[i] = -speed;
-      candidate->state.wheel_angle[i] = remainderf(
-          candidate->state.wheel_angle[i] + (float)M_PI, 2.0f * (float)M_PI);
-      delta = remainderf(candidate->state.wheel_angle[i] -
-                             setpoint->wheels.wheel_angle[i],
-                         2.0f * (float)M_PI);
+      candidate->state.wheel_angle[i] =
+          MathWrapPi(candidate->state.wheel_angle[i] + (float)M_PI);
+      delta = MathAngleDiff(candidate->state.wheel_angle[i],
+                            setpoint->wheels.wheel_angle[i]);
     }
     feasible &= fabsf(candidate->state.wheel_speed[i] - previous) <=
                     speed_step + 1e-6f &&
@@ -207,9 +206,8 @@ void SteerSetpointUpdate(SteerSetpoint *setpoint, Chassis *chassis,
       {
         continue;
       }
-      float delta = remainderf(desired.state.wheel_angle[i] -
-                                   setpoint->wheels.wheel_angle[i],
-                               2.0f * (float)M_PI);
+      float delta = MathAngleDiff(desired.state.wheel_angle[i],
+                                  setpoint->wheels.wheel_angle[i]);
       if (fabsf(delta) <= angle_step + 1e-6f)
       {
         continue;
@@ -221,9 +219,8 @@ void SteerSetpointUpdate(SteerSetpoint *setpoint, Chassis *chassis,
         is_presteering = true;
       }
       candidate.state.wheel_angle[i] =
-          remainderf(setpoint->wheels.wheel_angle[i] +
-                         fminf(fmaxf(delta, -angle_step), angle_step),
-                     2.0f * (float)M_PI);
+          MathWrapPi(setpoint->wheels.wheel_angle[i] +
+                     MathClamp(delta, -angle_step, angle_step));
     }
   }
   setpoint->velocity = candidate.velocity;
@@ -244,8 +241,7 @@ void SteerSpeedCorrect(const ChassisState *target, const float angle[4],
 {
   for (int i = 0; i < 4; i++)
   {
-    float delta = fabsf(
-        remainderf(target->wheel_angle[i] - angle[i], 2.0f * (float)M_PI));
+    float delta = fabsf(MathAngleDiff(target->wheel_angle[i], angle[i]));
     float phase = fminf(fmaxf(angle_scale, 0.0f) * delta, (float)M_PI / 2.0f);
     float correction = fmaxf(cosf(phase), 0.0f);
     speed[i] = target->wheel_speed[i] * correction * correction * correction;
@@ -324,6 +320,12 @@ bool ChassisEstimateVelocity(const Chassis *chassis, const float speed[4],
                              float gyro_weight, ChassisVelocity *velocity,
                              float *residual)
 {
+  if (chassis == NULL || speed == NULL || velocity == NULL ||
+      residual == NULL || (chassis->type == kSteerWheel && angle == NULL))
+  {
+    return false;
+  }
+
   float matrix[3][4] = {0};
   float rows[8][4] = {0};
   int count = chassis->type == kSteerWheel ? 8 : 4;
@@ -368,25 +370,59 @@ bool ChassisEstimateVelocity(const Chassis *chassis, const float speed[4],
   }
   matrix[2][2] += gyro_weight;
   matrix[2][3] += gyro_weight * gyro_omega;
+
+  // 采用带列主元选择的高斯-约旦消元法（Gauss-Jordan with Partial Pivoting）求解 3x3 正规方程
   for (int i = 0; i < 3; i++)
   {
-    if (fabsf(matrix[i][i]) < 1e-8f)
+    // 列主元选取：寻找当前列 i 中绝对值最大的行，降低浮点舍入误差
+    int pivot_row = i;
+    float max_val = fabsf(matrix[i][i]);
+    for (int r = i + 1; r < 3; r++)
+    {
+      float val = fabsf(matrix[r][i]);
+      if (val > max_val)
+      {
+        max_val = val;
+        pivot_row = r;
+      }
+    }
+
+    // 奇异性检查：最大主元过小说明方程病态或不可解（如舵轮打滑或几何退化）
+    if (max_val < 1e-6f)
     {
       return false;
     }
+
+    // 交换主元行
+    if (pivot_row != i)
+    {
+      for (int k = i; k < 4; k++)
+      {
+        float temp = matrix[i][k];
+        matrix[i][k] = matrix[pivot_row][k];
+        matrix[pivot_row][k] = temp;
+      }
+    }
+
+    // 归一化当前主元行
     float divisor = matrix[i][i];
     for (int k = i; k < 4; k++)
     {
       matrix[i][k] /= divisor;
     }
+
+    // 消去其他行的当前列元素
     for (int j = 0; j < 3; j++)
     {
       if (j != i)
       {
         float factor = matrix[j][i];
-        for (int k = i; k < 4; k++)
+        if (fabsf(factor) > 1e-9f)
         {
-          matrix[j][k] -= factor * matrix[i][k];
+          for (int k = i; k < 4; k++)
+          {
+            matrix[j][k] -= factor * matrix[i][k];
+          }
         }
       }
     }

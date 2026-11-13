@@ -104,6 +104,7 @@ void FdcanInit(FDCAN_HandleTypeDef *hfdcan, FdcanRxCallback callback)
   g_fdcan_object[index].tx_header.MessageMarker = 0;
   g_fdcan_object[index].callback = callback;
   g_fdcan_object[index].fifo_active = 0;
+  g_fdcan_object[index].tx_dropped_count = 0;
 
   FdcanFilterConfigAll(hfdcan);
   FdcanGlobalFilterConfig(hfdcan);
@@ -122,14 +123,15 @@ void FdcanInit(FDCAN_HandleTypeDef *hfdcan, FdcanRxCallback callback)
  * @param tx_data 发送数据指针
  * @param tx_length 发送数据长度
  * @param std_id 标准ID
+ * @return true表示成功推入硬件发送FIFO，false表示参数非法或FIFO已满
  */
-void FdcanTransmit(FDCAN_HandleTypeDef *hfdcan, uint8_t *tx_data,
+bool FdcanTransmit(FDCAN_HandleTypeDef *hfdcan, uint8_t *tx_data,
                    uint32_t tx_length, uint32_t std_id)
 {
   uint32_t index = FdcanIndex(hfdcan);
   if (index == 0xFFU || (tx_data == NULL && tx_length > 0U))
   {
-    return;
+    return false;
   }
 
   if (tx_length > 8U)
@@ -146,14 +148,24 @@ void FdcanTransmit(FDCAN_HandleTypeDef *hfdcan, uint8_t *tx_data,
   tx_header.Identifier = std_id;
   tx_header.DataLength = FdcanLengthToDlc(tx_length);
 
+  // 短暂屏蔽全局中断，保护 FDCAN 硬件 Tx FIFO 索引分配及 Message RAM 写入的原子性
   uint32_t primask = __get_PRIMASK();
   __disable_irq();
-  (void)HAL_FDCAN_AddMessageToTxFifoQ(g_fdcan_object[index].hfdcan, &tx_header,
-                                      tx_buffer);
+  HAL_StatusTypeDef status = HAL_FDCAN_AddMessageToTxFifoQ(
+      g_fdcan_object[index].hfdcan, &tx_header, tx_buffer);
   if (primask == 0U)
   {
     __enable_irq();
   }
+
+  // 捕获发送结果，若硬件 FIFO 满或出错则记录丢帧统计
+  if (status != HAL_OK)
+  {
+    g_fdcan_object[index].tx_dropped_count++;
+    return false;
+  }
+
+  return true;
 }
 
 /**

@@ -1,8 +1,10 @@
 #include "alg_pid.h"
 
-#include "math.h"
-#include "stddef.h"
-#include "stdbool.h"
+#include <math.h>
+#include <stdbool.h>
+#include <stddef.h>
+
+#include "alg_conversion.h"
 /**
  * @brief 更新增益并用积分状态保持当前控制输出
  * @param pid_object PID控制器结构体指针
@@ -40,8 +42,8 @@ bool PidSetGains(PidObject *pid_object, float kp, float ki, float kd)
   {
     pid_object->integral_max = integral_limit / ki;
     pid_object->error_sum =
-        fminf(fmaxf(pid_object->error_sum, -pid_object->integral_max),
-              pid_object->integral_max);
+        MathClamp(pid_object->error_sum, -pid_object->integral_max,
+                  pid_object->integral_max);
   }
   return true;
 }
@@ -64,8 +66,8 @@ void PidTrackOutput(PidObject *pid_object, float output_difference,
   float fraction = fminf(tracking_rate * pid_object->sampling_time, 1.0f);
   pid_object->error_sum += fraction * output_difference / pid_object->ki;
   pid_object->error_sum =
-      fminf(fmaxf(pid_object->error_sum, -pid_object->integral_max),
-            pid_object->integral_max);
+      MathClamp(pid_object->error_sum, -pid_object->integral_max,
+                pid_object->integral_max);
 }
 
 /**
@@ -217,20 +219,12 @@ float PidCalculate(PidObject *pid_object, float reference, float feedback)
   pid_object->output = p_out + i_out + d_out + ff_out;
   if (pid_object->is_deadband_enabled)
   {
-    if (pid_object->output > -pid_object->deadband_threshold &&
-        pid_object->output < pid_object->deadband_threshold)
-    {
-      pid_object->output = 0.0f;
-    }
+    pid_object->output =
+        MathDeadband(pid_object->output, pid_object->deadband_threshold);
   }
-  if (pid_object->output > pid_object->output_max)
-  {
-    pid_object->output = pid_object->output_max;
-  }
-  else if (pid_object->output < -pid_object->output_max)
-  {
-    pid_object->output = -pid_object->output_max;
-  }
+  pid_object->output =
+      MathClamp(pid_object->output, -pid_object->output_max,
+                pid_object->output_max);
   pid_object->previous_error = pid_object->error;
   return pid_object->output;
 }

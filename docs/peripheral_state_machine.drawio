@@ -1,0 +1,161 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="Electron" agent="Skywalker-Drawio-Generator" version="24.7.5">
+  <diagram id="diag_外设安装挂载与生命周期状态机" name="外设安装挂载与生命周期状态机">
+    <mxGraphModel dx="2040" dy="1180" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2040" pageHeight="1180" math="1" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title_banner" value="&lt;b&gt;Skywalker H7 外设安装挂载与生命周期状态机设计图&lt;/b&gt;&lt;br&gt;涵盖 BSP 通信初始化、传感器/电机安装坐标变换、运行期核心状态流转（实线：已实现驱动接口 | 虚线：在线超时监控与故障自愈扩展）" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="14" width="1960" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_mount" value="阶段一：底层通信总线初始化与外设实例挂载链 (BSP Layer → Device Layer)" style="swimlane;whiteSpace=wrap;html=1;startSize=32;rounded=1;arcSize=6;fillColor=#F8FAFC;swimlaneFillColor=#F8FAFC;swimlaneHeadColor=#0F172A;strokeColor=#64748B;strokeWidth=1.5;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="1960" height="225" as="geometry" />
+        </mxCell>
+        <mxCell id="m_bsp" value="&lt;b&gt;1. 通信总线外设初始化 (bsp_fdcan / bsp_uart / bsp_spi)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;FdcanInit()&lt;/b&gt;：配置标准帧过滤器与 FIFO0/1 接收中断回调&lt;br&gt;• &lt;b&gt;FdcanTransmit()&lt;/b&gt;：PRIMASK 临界区保护 + \(N_{\text{drop}}\) 丢包计数&lt;br&gt;• &lt;b&gt;UartInit()&lt;/b&gt;：DMA 双缓冲 (rx_buffer_0/1) + 32B Cache 对齐失效处理&lt;br&gt;• &lt;b&gt;SpiInit()&lt;/b&gt;：高速 SPI + DMA 传输，支持陀螺仪与磁编码器异步采样" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="65" y="126" width="410" height="162" as="geometry" />
+        </mxCell>
+        <mxCell id="m_imu" value="&lt;b&gt;2A. 惯导安装矩阵与恒温控制 (dev_bmi088)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;Bmi088Init()&lt;/b&gt;：陀螺仪 \(\pm 2000^\circ/\text{s}\)、加速度计 \(\pm 3g\) 寄存器配置与自检&lt;br&gt;• &lt;b&gt;Bmi088ImuSetInstallMatrix()&lt;/b&gt;：配置安装旋转矩阵 \(R_{\text{install}} \in SO(3)\)&lt;br&gt;• &lt;b&gt;Bmi088HeaterInit()&lt;/b&gt;：TIM3 PWM 恒温 PID 闭环 (is_heater_enabled)&lt;br&gt;• &lt;b&gt;Bmi088ImuInit()&lt;/b&gt;：在线静止检测、零偏标定 \(b_g\) 与四元数 EKF 初始化" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ECFDF5;strokeColor=#059669;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="565" y="126" width="420" height="162" as="geometry" />
+        </mxCell>
+        <mxCell id="m_motor" value="&lt;b&gt;2B. 电机与执行器注册挂载 (dev_dm / dev_dji / dev_lk)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;DmMotorInit()&lt;/b&gt;：绑定 CAN ID、控制模式 (MIT / PosVel / Vel / ForcePos)&lt;br&gt;  与物理量程映射 \((p_{\max},\, v_{\max},\, \tau_{\max})\)，维护 state.error_code&lt;br&gt;• &lt;b&gt;DjiMotorInit() / LkMotorInit()&lt;/b&gt;：绑定反馈 ID、减速比 \(r\) 与转矩常数 \(K_t\)&lt;br&gt;• &lt;b&gt;DjiMotorUpdate()&lt;/b&gt;：8192 编码器过零检测与多圈连续角度展开 \(\theta_{\text{total}}\)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F0FDF4;strokeColor=#16A34A;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="1075" y="126" width="430" height="162" as="geometry" />
+        </mxCell>
+        <mxCell id="m_rc_ref" value="&lt;b&gt;2C. 遥控器与裁判系统挂载 (dev_dji_dt7 / app_referee)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;DjiDt7Init()&lt;/b&gt;：USART3 18 字节 DBUS 帧解析，通道与拨杆归一化&lt;br&gt;• &lt;b&gt;AppRefereeInit()&lt;/b&gt;：SPSC 无锁环形缓冲区 (head/tail + __DMB() 内存屏障)&lt;br&gt;• &lt;b&gt;AppRefereeUpdate()&lt;/b&gt;：1kHz 解包 0x0201 状态与 0x0202 缓冲能量 \(E_{\text{buf}}\)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFBEB;strokeColor=#D97706;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="1595" y="126" width="380" height="162" as="geometry" />
+        </mxCell>
+        <mxCell id="e_m1_m2" value="绑定&lt;br&gt;SPI / PWM" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#2563EB;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="m_bsp" target="m_imu">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_m2_m3" value="绑定&lt;br&gt;FDCAN1/2/3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#059669;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="m_imu" target="m_motor">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_m3_m4" value="绑定&lt;br&gt;UART / DMA" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#16A34A;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="m_motor" target="m_rc_ref">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_fsm" value="阶段二：外设运行期统一生命周期状态机 (左列：离线超时保护与重同步 | 中列：正常生命周期主干 | 右列：硬件故障隔离与恢复)" style="swimlane;whiteSpace=wrap;html=1;startSize=32;rounded=1;arcSize=6;fillColor=#F8FAFC;swimlaneFillColor=#F8FAFC;swimlaneHeadColor=#1E3A8A;strokeColor=#64748B;strokeWidth=1.5;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="335" width="1960" height="805" as="geometry" />
+        </mxCell>
+        <mxCell id="s_uninit" value="&lt;b&gt;状态 1：未挂载 / 上电初始态 (Unmounted / Uninitialized)&lt;/b&gt;&lt;br&gt;• 外设对象结构体清零 (state.is_enabled = false，is_imu_enabled = false)&lt;br&gt;• 等待驱动层调用 Init() 绑定底层 FdcanDevice / UartDevice / SpiDevice 通信句柄" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F1F5F9;strokeColor=#475569;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="710" y="380" width="620" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="s_probe" value="&lt;b&gt;状态 2：通信握手与寄存器自检态 (Probing &amp; Self-Test)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;BMI088&lt;/b&gt;：校验 CHIP_ID 并验证量程配置 (排查 kBmi088NoSensor / AccelConfigError / GyroRangeError)&lt;br&gt;• &lt;b&gt;CAN 电机&lt;/b&gt;：等待首帧合法反馈报文，校验 master_id、初始单圈角 \(\theta_{\text{ecd}}\) 与驱动器电压温度状态" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#EFF6FF;strokeColor=#2563EB;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="710" y="525" width="620" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="s_calib" value="&lt;b&gt;状态 3：零偏标定与机械零点对齐态 (Calibrating &amp; Zeroing)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;BMI088&lt;/b&gt;：恒温收敛后采集静止窗口角速度均值标定零偏 \(b_g\)（若晃动超限报 kBmi088CalibrateMotionError）&lt;br&gt;• &lt;b&gt;电机编码器&lt;/b&gt;：初始化多圈展开基准角 \(\theta_{\text{offset}}\)，达妙电机支持零点标定指令 kDmMotorCommandZeroOffset (0xFE)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ECFDF5;strokeColor=#059669;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="710" y="685" width="620" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="s_disabled" value="&lt;b&gt;状态 4：安全失能待命态 (Disabled / Standby，state.is_enabled = false)&lt;/b&gt;&lt;br&gt;• 持续接收并更新姿态四元数 \(q\)、多圈位置 \(\theta\)、角速度 \(\omega\) 与温度 \(T\)，闭环控制器保持复位跟踪&lt;br&gt;• &lt;b&gt;安全输出&lt;/b&gt;：达妙发送 kDmMotorCommandDisable (0xFD)，大疆/瓴控发送零电流帧 \(I_{\text{cmd}} = 0\)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FEFCE8;strokeColor=#CA8A04;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="710" y="850" width="620" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="s_enabled" value="&lt;b&gt;状态 5：闭环使能运行态 (Enabled / Closed-Loop Active，state.is_enabled = true)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;达妙电机&lt;/b&gt;：下发 kDmMotorCommandEnable (0xFC) 进入闭环，实时打包 MIT 阻抗控制帧 \((p_d,\, v_d,\, K_p,\, K_d,\, \tau_{\text{ff}})\)&lt;br&gt;• &lt;b&gt;大疆/瓴控电机与惯导&lt;/b&gt;：\(1\,\text{kHz}\) 高频执行级联 PID / LQR / 底盘功率分配，实时监控丢包计数与故障码" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#DCFCE7;strokeColor=#15803D;strokeWidth=2.2;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="710" y="1005" width="620" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="s_offline" value="&lt;b&gt;离线失联保护态 (Offline / Timeout，扩展看门狗机制)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;触发判据&lt;/b&gt;：连续未收到合法反馈报文 \(\Delta t_{\text{rx}} &gt; T_{\text{timeout}}\)&lt;br&gt;  （电机 \(50\,\text{ms}\) | DT7 遥控器 \(100\,\text{ms}\) | 裁判系统 \(500\,\text{ms}\)）&lt;br&gt;• &lt;b&gt;保护动作&lt;/b&gt;：立即强制置 state.is_enabled = false，&lt;br&gt;  清空积分器并下发零电流 / 零力矩指令 \(u = 0\) 防止飞车" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFF7ED;strokeColor=#EA580C;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="85" y="545" width="410" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="s_reconnect" value="&lt;b&gt;低频重连探测与多圈角重同步 (Reconnect &amp; Resync)&lt;/b&gt;&lt;br&gt;• 以 \(5 \sim 10\,\text{Hz}\) 低频发送失能帧 (0xFD) 或状态查询帧尝试唤醒&lt;br&gt;• &lt;b&gt;防暴冲重同步&lt;/b&gt;：重新收到电机反馈帧后，以当前单圈角&lt;br&gt;  重置多圈累计角基准 \(\theta_{\text{total}} \leftarrow \theta_{\text{ecd}}\)，随后退回待命态" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFEDD5;strokeColor=#C2410C;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="85" y="840" width="410" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="s_fault" value="&lt;b&gt;硬件 / 驱动故障锁死态 (Fault Locked)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;达妙电机 (state.error_code ≠ 0)&lt;/b&gt;：过压 0x08、欠压 0x09、&lt;br&gt;  过流 0x0A、MOS 过温 0x0B、线圈过温 0x0C、通讯丢失 0x0D、过载 0x0E&lt;br&gt;• &lt;b&gt;BMI088 (Bmi088Error)&lt;/b&gt;：自检失败或四元数 EKF 发散 (ImuEkfInitError)&lt;br&gt;• &lt;b&gt;FDCAN 总线异常&lt;/b&gt;：总线进入 Bus-Off 或发送队列持续溢出丢包" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FEF2F2;strokeColor=#DC2626;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;" vertex="1" parent="1">
+          <mxGeometry x="1545" y="545" width="410" height="185" as="geometry" />
+        </mxCell>
+        <mxCell id="s_clear" value="&lt;b&gt;故障清除与总线软复位态 (Fault Recovery)&lt;/b&gt;&lt;br&gt;• &lt;b&gt;达妙电机清错&lt;/b&gt;：发送 kDmMotorCommandClearError (0xFB) 并等待&lt;br&gt;  反馈帧确认 state.error_code == 0&lt;br&gt;• &lt;b&gt;总线恢复&lt;/b&gt;：检测 FDCAN PSR.BO 标志并重启 HAL_FDCAN_Start()&lt;br&gt;• &lt;b&gt;安全准则&lt;/b&gt;：故障清除后必须退回 Disabled 待命态，严禁直接跳回使能态" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FEE2E2;strokeColor=#B91C1C;strokeWidth=1.6;align=left;verticalAlign=middle;spacingLeft=10;spacingRight=10;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1545" y="840" width="410" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="e_mount_fsm" value="外设对象实例化完成" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#334155;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="m_imu" target="s_uninit">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="775" y="315" />
+              <mxPoint x="1020" y="315" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_u_p" value="调用 Init() 绑定总线句柄" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#2563EB;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_uninit" target="s_probe">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_p_c" value="CHIP_ID 与首帧反馈校验通过" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#059669;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_probe" target="s_calib">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_c_d" value="零偏 \(b_g\) 收敛 &amp; 机械零点对齐完成" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#CA8A04;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_calib" target="s_disabled">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_d_e" value="使能指令 0xFC / is_enabled=true" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.3;exitY=1.0;exitDx=0;exitDy=0;entryX=0.3;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#15803D;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_disabled" target="s_enabled">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_e_d" value="失能指令 0xFD / 遥控器急停" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.7;exitY=0.0;exitDx=0;exitDy=0;entryX=0.7;entryY=1.0;entryDx=0;entryDy=0;strokeColor=#CA8A04;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_enabled" target="s_disabled">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_p_off" value="首帧握手&lt;br&gt;响应超时" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.5;exitDx=0;exitDy=0;entryX=1.0;entryY=0.22;entryDx=0;entryDy=0;strokeColor=#EA580C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_probe" target="s_offline">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="602" y="580" />
+              <mxPoint x="602" y="585" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_d_off" value="待命期&lt;br&gt;反馈中断" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.25;exitDx=0;exitDy=0;entryX=1.0;entryY=0.78;entryDx=0;entryDy=0;strokeColor=#EA580C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_disabled" target="s_offline">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="602" y="876" />
+              <mxPoint x="602" y="685" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_e_off" value="运行期通信超时 \(\Delta t_{\text{rx}} &gt; T_{\text{timeout}}\) (强制急停)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#EA580C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_enabled" target="s_offline">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="58" y="1058" />
+              <mxPoint x="58" y="635" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_off_rec" value="切入低频重连探测" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#C2410C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_offline" target="s_reconnect">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_rec_d" value="报文恢复 &amp;&lt;br&gt;多圈角重同步" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.72;entryDx=0;entryDy=0;strokeColor=#15803D;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_reconnect" target="s_disabled">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="602" y="922" />
+              <mxPoint x="602" y="925" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_p_flt" value="传感器自检异常&lt;br&gt;Bmi088Error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.22;entryDx=0;entryDy=0;strokeColor=#DC2626;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_probe" target="s_fault">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1438" y="580" />
+              <mxPoint x="1438" y="586" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_c_flt" value="标定晃动超限&lt;br&gt;或 EKF 异常" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.78;entryDx=0;entryDy=0;strokeColor=#DC2626;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_calib" target="s_fault">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1438" y="742" />
+              <mxPoint x="1438" y="689" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_e_flt" value="故障码非零或 Bus-Off 硬件保护" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=1.0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#DC2626;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_enabled" target="s_fault">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1980" y="1058" />
+              <mxPoint x="1980" y="638" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_flt_clr" value="执行 0xFB 清错 / 总线软复位" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#B91C1C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_fault" target="s_clear">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_clr_d" value="故障码清零 &amp;&lt;br&gt;退回安全待命" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.5;exitDx=0;exitDy=0;entryX=1.0;entryY=0.72;entryDx=0;entryDy=0;strokeColor=#15803D;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_clear" target="s_disabled">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1438" y="922" />
+              <mxPoint x="1438" y="925" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

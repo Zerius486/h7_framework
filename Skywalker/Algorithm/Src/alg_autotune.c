@@ -4,17 +4,7 @@
 #include <stddef.h>
 #include <string.h>
 
-/**
- * @brief 限制浮点数范围
- * @param value 输入值
- * @param lower 下限
- * @param upper 上限
- * @return 限幅后的值
- */
-static float AutotuneClamp(float value, float lower, float upper)
-{
-  return fminf(fmaxf(value, lower), upper);
-}
+#include "alg_conversion.h"
 
 /**
  * @brief 初始化独立的验证控制器
@@ -128,12 +118,12 @@ static void AutotunePrime(AutotuneObject *tune, float position, float omega)
   speed->feedback = omega;
   speed->previous_feedback = omega;
   float direction =
-      AutotuneClamp(omega / (0.01f * tune->config.speed_limit), -1.0f, 1.0f);
+      MathClamp(omega / (0.01f * tune->config.speed_limit), -1.0f, 1.0f);
   float current = tune->result.model.viscous * omega +
                   tune->result.model.friction * direction +
                   tune->result.model.bias;
   speed->error_sum =
-      AutotuneClamp(current, -speed->output_max, speed->output_max) / speed->ki;
+      MathClamp(current, -speed->output_max, speed->output_max) / speed->ki;
   tune->position_pid.reference = position;
   tune->position_pid.previous_reference = position;
   tune->position_pid.feedback = position;
@@ -452,7 +442,7 @@ static float AutotuneFeedforward(AutotuneObject *tune, const PidObject *speed)
   float acceleration = (speed->reference - speed->previous_reference) /
                        tune->config.sampling_time;
   float requested =
-      AutotuneClamp(tune->result.model.inertia * acceleration,
+      MathClamp(tune->result.model.inertia * acceleration,
                     -0.3f * speed->output_max, 0.3f * speed->output_max);
   tune->feedforward += 0.1f * (requested - tune->feedforward);
   return tune->feedforward;
@@ -630,7 +620,7 @@ float AutotuneUpdate(AutotuneObject *tune, float position, float omega,
       if (tune->config.tune_position)
       {
         target = centered ? 0.0f
-                          : AutotuneClamp(tune->result.position_kp *
+                          : MathClamp(tune->result.position_kp *
                                               (tune->center - position),
                                           -0.3f * tune->test_amplitude,
                                           0.3f * tune->test_amplitude);
@@ -658,7 +648,7 @@ float AutotuneUpdate(AutotuneObject *tune, float position, float omega,
         return AutotuneFail(tune, kAutotuneTrackingError);
       }
       tune->requested_current = request;
-      return AutotuneClamp(request, -tune->config.current_limit,
+      return MathClamp(request, -tune->config.current_limit,
                            tune->config.current_limit);
     }
     if (tune->state == kAutotuneSpeed && tune->config.optimize &&
@@ -726,7 +716,7 @@ float AutotuneUpdate(AutotuneObject *tune, float position, float omega,
           return AutotuneFail(tune, kAutotuneTrackingError);
         }
         tune->requested_current = request;
-        return AutotuneClamp(request, -tune->config.current_limit,
+        return MathClamp(request, -tune->config.current_limit,
                              tune->config.current_limit);
       }
       if (tune->samples == 0U || tune->result.rms_error > 0.55f ||
@@ -767,7 +757,7 @@ float AutotuneUpdate(AutotuneObject *tune, float position, float omega,
       else if (tune->state == kAutotuneSpeed && tune->config.tune_position)
       {
         float lag = atan2f(-tune->velocity_cosine, tune->velocity_sine);
-        float time_constant = tanf(AutotuneClamp(lag, 0.0f, 1.2f)) / frequency;
+        float time_constant = tanf(MathClamp(lag, 0.0f, 1.2f)) / frequency;
         tune->result.position_kp =
             fminf(tune->result.position_kp, 0.1f / fmaxf(time_constant, dt));
         tune->position_pid.kp = tune->result.position_kp;
@@ -804,7 +794,7 @@ float AutotuneUpdate(AutotuneObject *tune, float position, float omega,
     }
   }
   tune->requested_current = request;
-  return AutotuneClamp(request, -tune->config.current_limit,
+  return MathClamp(request, -tune->config.current_limit,
                        tune->config.current_limit);
 }
 
@@ -943,8 +933,8 @@ float AutotuneAdapt(AutotuneObject *tune, PidObject *speed, float omega,
           model.inertia * tune->result.bandwidth * tune->result.bandwidth;
       kp *= tune->gain_scale[0];
       ki *= tune->gain_scale[1];
-      kp = AutotuneClamp(kp, 0.98f * speed->kp, 1.02f * speed->kp);
-      ki = AutotuneClamp(ki, 0.98f * speed->ki, 1.02f * speed->ki);
+      kp = MathClamp(kp, 0.98f * speed->kp, 1.02f * speed->kp);
+      ki = MathClamp(ki, 0.98f * speed->ki, 1.02f * speed->ki);
       (void)PidSetGains(speed, kp, ki, 0.0f);
       speed->integral_max = speed->output_max / ki;
       tune->result.speed_kp = kp;

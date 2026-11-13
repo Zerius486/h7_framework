@@ -1,6 +1,43 @@
 #include "dev_lk_motor.h"
 
 #include <string.h>
+#include "stm32h7xx_hal.h"
+
+static bool LkMotorGuardEnableHook(void *device_ptr)
+{
+  LkMotor *motor = (LkMotor *)device_ptr;
+  if (motor == NULL)
+  {
+    return false;
+  }
+  motor->state.is_enabled = true;
+  return true;
+}
+
+static void LkMotorGuardDisableHook(void *device_ptr)
+{
+  LkMotor *motor = (LkMotor *)device_ptr;
+  if (motor == NULL)
+  {
+    return;
+  }
+  motor->state.is_enabled = false;
+  motor->state.given_current_units = 0;
+}
+
+static void LkMotorGuardResyncHook(void *device_ptr)
+{
+  LkMotor *motor = (LkMotor *)device_ptr;
+  if (motor == NULL)
+  {
+    return;
+  }
+  // 离线恢复防暴冲：重置多圈累计初始化标志与圈数计数
+  motor->state.is_encoder_initialized = false;
+  motor->state.total_round = 0;
+  motor->state.is_enabled = false;
+  motor->state.given_current_units = 0;
+}
 
 /**
  * @brief 限制LK电机电流单位值
@@ -51,7 +88,18 @@ void LkMotorInit(LkMotor *motor, uint8_t id)
 
   memset(motor, 0, sizeof(*motor));
   motor->state.id = id;
-  motor->state.is_enabled = true;
+  motor->state.is_enabled = false;
+
+  PeripheralOps ops = {
+      .on_enable = LkMotorGuardEnableHook,
+      .on_disable = LkMotorGuardDisableHook,
+      .on_offline = LkMotorGuardDisableHook,
+      .on_resync = LkMotorGuardResyncHook,
+      .on_clear_fault = NULL,
+      .on_reconnect_probe = NULL,
+  };
+  PeripheralGuardInit(&motor->guard, "lk_motor", kPeripheralTypeMotorLk,
+                      kPeripheralDefaultTimeoutMotorMs, motor, &ops);
 }
 
 /**
@@ -65,6 +113,9 @@ void LkMotorUpdate(LkMotor *motor, const uint8_t rx_data[8])
   {
     return;
   }
+
+  // 先刷新外设心跳喂狗，若刚从离线态恢复则先触发 on_resync 重置多圈展开基准
+  PeripheralGuardFeed(&motor->guard, HAL_GetTick());
 
   motor->state.last_encoder = motor->state.encoder;
   motor->state.encoder =
@@ -129,7 +180,7 @@ void LkMotorEnable(LkMotor *motor)
 {
   if (motor != NULL)
   {
-    motor->state.is_enabled = true;
+    (void)PeripheralGuardEnable(&motor->guard);
   }
 }
 
@@ -141,8 +192,7 @@ void LkMotorDisable(LkMotor *motor)
 {
   if (motor != NULL)
   {
-    motor->state.is_enabled = false;
-    motor->state.given_current_units = 0;
+    (void)PeripheralGuardDisable(&motor->guard);
   }
 }
 
@@ -176,7 +226,7 @@ void LkMotorPackCurrentGroup(LkMotor *const motors[], uint8_t motor_count,
     }
 
     int16_t current =
-        motor->state.is_enabled
+        (motor->state.is_enabled && PeripheralIsEnabled(&motor->guard))
             ? LkMotorClampCurrent(motor->state.given_current_units)
             : 0;
     uint8_t offset = (uint8_t)((motor->state.id - 1U) * 2U);

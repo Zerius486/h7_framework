@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "dev_peripheral.h"
+
 enum
 {
   kDmMotorCanDataLength = 8,                   // 达妙CAN数据帧长度
@@ -89,10 +91,11 @@ typedef struct
 // 达妙电机对象结构体
 typedef struct
 {
-  DmMotorState state;   // 电机状态
-  DmMotorType type;     // 电机类型
-  DmMotorMode mode;     // 控制模式
-  DmMotorLimits limits; // 协议量程
+  DmMotorState state;    // 电机状态
+  DmMotorType type;      // 电机类型
+  DmMotorMode mode;      // 控制模式
+  DmMotorLimits limits;  // 协议量程
+  PeripheralGuard guard; // 统一外设生命周期守护对象
 } DmMotor;
 
 // API函数声明

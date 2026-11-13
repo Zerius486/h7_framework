@@ -7,15 +7,15 @@
 | 层 | 职责 |
 | --- | --- |
 | BSP | UART、FDCAN、SPI、流缓存、DMA 与计时封装 |
-| Device | 电机、遥控器和 IMU 的反馈解析、状态与指令 |
+| Device | 电机、遥控器、IMU 驱动与统一外设守护状态机 |
 | Algorithm | 通用控制、估计、滤波、运动学及辨识算法 |
-| Application | 设备配置、通信协议、任务与机器人控制逻辑 |
+| Application | 设备配置、通信协议、任务调度与机器人控制逻辑 |
 
 Device 使用 BSP 通信，也可组合算法；Application 组织设备和控制流程。通用算法不依赖设备型号或应用协议。
 
 启动顺序为外设初始化、内核初始化、`AppConfigInit()`、创建任务、启动调度器，随后执行各任务的 `TaskInit()` 和 `TaskLoop()`。`app_task.c` 用 `osDelayUntil()` 周期调度，当前 RTOS tick 为 1 ms。
 
-常规开发修改 `app_config.h/.c`、`app_robot.c`、`app_protocol.h/.c`，机构复杂时可拆分应用文件。裁判系统解析位于 `app_referee.h/.c`。当前 `AppConfigInit()` 初始化默认关闭的调试记录器；四个任务循环为空，实际设备、控制逻辑和通信接收回调仍需由应用接入。
+常规开发修改 `app_config.h/.c`、`app_robot.c`、`app_protocol.h/.c`，机构复杂时可拆分应用文件。裁判系统解析位于 `app_referee.h/.c`。当前 `AppConfigInit()` 初始化默认关闭的调试记录器；`ManagerTaskInit()` / `ManagerTaskLoop()` 已接入 `PeripheralManager` 轮询与关键外设急停联锁，其余三个任务循环为空，实际设备、控制逻辑和通信接收回调仍需由应用接入。
 
 ## 1. 配置外设与机构
 
@@ -23,25 +23,41 @@ Device 使用 BSP 通信，也可组合算法；Application 组织设备和控�
 
 普通自定义串口优先使用 UART1、UART7、UART10；UART2/3 用于 RS485，UART5 用于 DT7，按实际硬件用途分配。仅填写串口句柄不会自动注册接收回调。
 
-在 `AppConfigInit()` 中直接调用 BSP、设备和算法初始化接口，注册 CAN/UART 接收回调。此函数在任务创建前执行；需要任务上下文的初始化放入相应 `TaskInit()`。
+在 `AppConfigInit()` 中直接调用 BSP、设备和算法初始化接口，注册 CAN/UART 接收回调，并调用 `PeripheralManagerRegister(&dev.guard, is_critical)` 登记外设守护。此函数在任务创建前执行；需要任务上下文的初始化放入相应 `TaskInit()`。
 
 方向、减速比和零位可以使用 `AppMotorConfig` 表达。应用按具体驱动反馈的轴侧定义，显式完成机构坐标转换；不要对驱动已经换算过的量重复应用减速比。
 
+### 外设使能与守护
+
+各电机、BMI088、DT7 及裁判系统均内嵌 `PeripheralGuard`（`dev_peripheral.h`，状态流转见[外设状态机设计图](peripheral_state_machine.pdf)）。初始化后外设默认处于待命流程；收到有效反馈（IMU 完成初始化/标定）后，需显式调用使能接口才允许输出非零控制量，未使能、离线或故障状态下控制/打包接口均自动归零输出。
+
+- 大疆电机：`DjiMotorEnable()` / `DjiMotorDisable()`
+- 瓴控电机：`LkMotorEnable()` / `LkMotorDisable()`
+- 达妙电机：`DmMotorPackEnable()` / `DmMotorPackDisable()`
+- 通用外设：`PeripheralGuardEnable()` / `PeripheralGuardDisable()`
+
+通过 `PeripheralManagerRegister(&dev.guard, is_critical)` 登记外设后，标记为 `is_critical = true` 的关键外设一旦故障或超时离线，`ManagerTaskLoop()` 会自动触发全局急停（`PeripheralManagerEmergencyStopAll()`）。
+
 ### DM8009P 电机
 
-`dev_dm_motor.h` 支持 J4310 和 J8009P，复用 MIT、位置速度及速度模式的控制帧与反馈解析：
+`dev_dm_motor.h` 支持 J4310 和 J8009P，复用 MIT、位置速度、速度及力位混控模式的控制帧与反馈解析：
 
 ```c
 DmMotor motor;
 DmMotorInit(&motor, kDmMotorTypeJ8009P, kDmMotorModeMit, 1U, 0x11U);
+
+// 收到反馈就绪后打包使能帧并发送
+uint8_t tx_data[8];
+DmMotorPackEnable(&motor, tx_data);
+
 motor.state.given_torque = 2.0f;
 motor.state.kp = 0.0f;
 motor.state.kd = 0.0f;
-
-uint8_t tx_data[8];
 DmMotorPackMit(&motor, tx_data);
-// 使用DmMotorTxId(&motor)发送；使能命令由应用按启动流程发送。
+// 使用 DmMotorTxId(&motor) 发送
 ```
+
+`DmMotorUpdate()` 按达妙反馈高 4 位解析 `error_code`（`0` 失能、`1` 使能、`>= 0x08` 为硬件故障）；四个模式打包函数在未使能、离线或故障状态下均输出安全零值。
 
 J8009P 的协议量程预设为位置 ±12.5 rad、速度 ±45 rad/s、力矩 ±54 Nm。接入前用达妙调试助手读取电机的 PMAX、VMAX、TMAX；若不同，在初始化后修改 `motor.limits.position_max`、`velocity_max`、`torque_max`，三者必须为正。命令编码与所有模式的反馈解码共用这组量程。协议量程不等于额定或峰值力矩，实际输出限幅由应用按电机规格与机构要求设置。
 

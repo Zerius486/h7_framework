@@ -69,7 +69,7 @@ extern uint32_t SystemCoreClock;
 #define configUSE_SB_COMPLETED_CALLBACK          ( 0 )
 #define configUSE_MINI_LIST_ITEM                ( 1 )
 #define configMINIMAL_STACK_SIZE                 ((uint16_t)128)
-#define configTOTAL_HEAP_SIZE                    ((size_t)15360)
+#define configTOTAL_HEAP_SIZE                    ((size_t)65536) // 堆内存扩充至64KB，满足多任务栈及动态对象需求
 #define configMAX_TASK_NAME_LEN                  ( 16 )
 #define configHEAP_CLEAR_MEMORY_ON_FREE          0
 #define configUSE_TRACE_FACILITY                 1
@@ -166,6 +166,8 @@ standard names. */
 
 /* USER CODE BEGIN Defines */
 /* Section where parameter definitions can be added (for instance, to override default ones in FreeRTOS.h) */
+#define configCHECK_FOR_STACK_OVERFLOW           2 // 启用任务栈溢出检测（方法2：检查栈顶模式标记）
+#define configUSE_MALLOC_FAILED_HOOK             1 // 启用内存分配失败钩子，防止静默内存耗尽
 /* USER CODE END Defines */
 
 #endif /* FREERTOS_CONFIG_H */

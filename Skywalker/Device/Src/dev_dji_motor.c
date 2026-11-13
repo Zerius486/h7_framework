@@ -4,6 +4,46 @@
 #include <string.h>
 
 #include "alg_conversion.h"
+#include "stm32h7xx_hal.h"
+
+static bool DjiMotorGuardEnableHook(void *device_ptr)
+{
+  DjiMotor *motor = (DjiMotor *)device_ptr;
+  if (motor == NULL)
+  {
+    return false;
+  }
+  motor->state.is_enabled = true;
+  return true;
+}
+
+static void DjiMotorGuardDisableHook(void *device_ptr)
+{
+  DjiMotor *motor = (DjiMotor *)device_ptr;
+  if (motor == NULL)
+  {
+    return;
+  }
+  motor->state.is_enabled = false;
+  motor->state.given_current = 0.0f;
+  PidReset(&motor->state.speed_loop);
+  PidReset(&motor->state.position_loop);
+}
+
+static void DjiMotorGuardResyncHook(void *device_ptr)
+{
+  DjiMotor *motor = (DjiMotor *)device_ptr;
+  if (motor == NULL)
+  {
+    return;
+  }
+  // 离线恢复后防暴冲重同步：重置连续角度展开基准，复位积分器并保持失能待命
+  motor->state.is_enabled = false;
+  motor->state.is_angle_initialized = false;
+  motor->state.given_current = 0.0f;
+  PidReset(&motor->state.speed_loop);
+  PidReset(&motor->state.position_loop);
+}
 
 static float DjiMotorCurrentLimitA(DjiMotorType type)
 {
@@ -18,32 +58,6 @@ static float DjiMotorCurrentLimitA(DjiMotorType type)
   default:
     return 0.0f;
   }
-}
-
-static float DjiMotorClamp(float value, float min, float max)
-{
-  if (value > max)
-  {
-    return max;
-  }
-  if (value < min)
-  {
-    return min;
-  }
-  return value;
-}
-
-static float DjiMotorWrapPi(float angle)
-{
-  while (angle > (float)M_PI)
-  {
-    angle -= 2.0f * (float)M_PI;
-  }
-  while (angle < -(float)M_PI)
-  {
-    angle += 2.0f * (float)M_PI;
-  }
-  return angle;
 }
 
 /**
@@ -100,18 +114,18 @@ int16_t DjiMotorCurrentAmperesToUnits(DjiMotorType type, float current_a)
   switch (type)
   {
   case kDjiMotorM2006:
-    current_a = DjiMotorClamp(current_a, -kDjiM2006MotorCurrentLimitA,
-                              kDjiM2006MotorCurrentLimitA);
+    current_a = MathClamp(current_a, -kDjiM2006MotorCurrentLimitA,
+                          kDjiM2006MotorCurrentLimitA);
     return (int16_t)(current_a * kDjiM2006MotorCurrentLimitU /
                      kDjiM2006MotorCurrentLimitA);
   case kDjiMotorM3508:
-    current_a = DjiMotorClamp(current_a, -kDjiM3508MotorCurrentLimitA,
-                              kDjiM3508MotorCurrentLimitA);
+    current_a = MathClamp(current_a, -kDjiM3508MotorCurrentLimitA,
+                          kDjiM3508MotorCurrentLimitA);
     return (int16_t)(current_a * kDjiM3508MotorCurrentLimitU /
                      kDjiM3508MotorCurrentLimitA);
   case kDjiMotorGm6020:
-    current_a = DjiMotorClamp(current_a, -kDjiGm6020MotorCurrentLimitA,
-                              kDjiGm6020MotorCurrentLimitA);
+    current_a = MathClamp(current_a, -kDjiGm6020MotorCurrentLimitA,
+                          kDjiGm6020MotorCurrentLimitA);
     return (int16_t)(current_a * kDjiGm6020MotorCurrentLimitU /
                      kDjiGm6020MotorCurrentLimitA);
   default:
@@ -142,9 +156,47 @@ void DjiMotorInit(DjiMotor *motor, DjiMotorType type, DjiMotorMode mode,
     PidInit(&motor->state.position_loop, position_pid_config);
   }
 
-  motor->state.is_enabled = true;
+  motor->state.is_enabled = false;
   motor->type = type;
   motor->mode = mode;
+
+  PeripheralOps ops = {
+      .on_enable = DjiMotorGuardEnableHook,
+      .on_disable = DjiMotorGuardDisableHook,
+      .on_offline = DjiMotorGuardDisableHook,
+      .on_resync = DjiMotorGuardResyncHook,
+      .on_clear_fault = NULL,
+      .on_reconnect_probe = NULL,
+  };
+  PeripheralGuardInit(&motor->guard, "dji_motor", kPeripheralTypeMotorDji,
+                      kPeripheralDefaultTimeoutMotorMs, motor, &ops);
+}
+
+/**
+ * @brief 请求使能DJI电机闭环控制输出
+ * @param motor DJI电机结构体指针
+ * @return true 使能成功; false 处于离线或未就绪态，拒绝使能
+ */
+bool DjiMotorEnable(DjiMotor *motor)
+{
+  if (motor == NULL)
+  {
+    return false;
+  }
+  return PeripheralGuardEnable(&motor->guard);
+}
+
+/**
+ * @brief 失能DJI电机并清零输出与积分
+ * @param motor DJI电机结构体指针
+ */
+void DjiMotorDisable(DjiMotor *motor)
+{
+  if (motor == NULL)
+  {
+    return;
+  }
+  (void)PeripheralGuardDisable(&motor->guard);
 }
 
 /**
@@ -165,6 +217,10 @@ void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data)
 
   motor->state.angle = EncoderToRadian(encoder);
   motor->state.omega = RpmToRadS((float)rpm);
+
+  // 先刷新外设心跳喂狗，若刚从离线态恢复则先触发 on_resync 重置连续角展开基准
+  PeripheralGuardFeed(&motor->guard, HAL_GetTick());
+
   if (!motor->state.is_angle_initialized)
   {
     motor->state.continuous_angle = motor->state.angle;
@@ -174,7 +230,7 @@ void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data)
   else
   {
     motor->state.continuous_angle +=
-        DjiMotorWrapPi(motor->state.angle - motor->state.last_angle);
+        MathWrapPi(motor->state.angle - motor->state.last_angle);
     motor->state.last_angle = motor->state.angle;
   }
   motor->state.current =
@@ -213,8 +269,13 @@ void DjiMotorCurrentCalculateWithFeedback(DjiMotor *motor,
                                           float position_feedback,
                                           float omega_feedback)
 {
-  if (motor == NULL || !motor->state.is_enabled)
+  if (motor == NULL)
   {
+    return;
+  }
+  if (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard))
+  {
+    motor->state.given_current = 0.0f;
     return;
   }
 
@@ -252,8 +313,8 @@ void DjiMotorCurrentCalculateWithFeedback(DjiMotor *motor,
   float current_limit = DjiMotorCurrentLimitA(motor->type);
   if (current_limit > 0.0f)
   {
-    motor->state.given_current = DjiMotorClamp(motor->state.given_current,
-                                               -current_limit, current_limit);
+    motor->state.given_current = MathClamp(motor->state.given_current,
+                                           -current_limit, current_limit);
   }
 }
 
@@ -279,7 +340,8 @@ void DjiMotorPackCurrentGroup(DjiMotor *const motors[], uint8_t motor_count,
   for (uint8_t i = 0; i < motor_count && i < 4U; i++)
   {
     DjiMotor *motor = motors[i];
-    if (motor == NULL || !motor->state.is_enabled)
+    if (motor == NULL || !motor->state.is_enabled ||
+        !PeripheralIsEnabled(&motor->guard))
     {
       continue;
     }

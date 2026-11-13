@@ -1,5 +1,6 @@
 #include "alg_imu_ekf.h"
 
+#include "alg_conversion.h"
 #include "math.h"
 #include "string.h"
 /**
@@ -15,23 +16,6 @@ static void EkfSetIdentity(float *data, uint16_t size)
   {
     data[(uint32_t)i * size + i] = 1.0f;
   }
-}
-/**
- * @brief 将角度归一化到[-pi, pi]
- * @param x 输入角度
- * @return 归一化后的角度
- */
-static float EkfWrapPi(float x)
-{
-  while (x > M_PI)
-  {
-    x -= 2.0f * M_PI;
-  }
-  while (x < -M_PI)
-  {
-    x += 2.0f * M_PI;
-  }
-  return x;
 }
 /**
  * @brief 安全的cos函数，避免分母接近0
@@ -77,9 +61,9 @@ static void EkfPredictModelAndJacobian(ImuEkfObject *ekf,
   const float phi_dot = p + q * sin_phi * tan_theta + r * cos_phi * tan_theta;
   const float theta_dot = q * cos_phi - r * sin_phi;
   const float psi_dot = q * sin_phi * sec_theta + r * cos_phi * sec_theta;
-  x_minus[0] = EkfWrapPi(phi + dt * phi_dot);
-  x_minus[1] = EkfWrapPi(theta + dt * theta_dot);
-  x_minus[2] = EkfWrapPi(x[2] + dt * psi_dot);
+  x_minus[0] = MathWrapPi(phi + dt * phi_dot);
+  x_minus[1] = MathWrapPi(theta + dt * theta_dot);
+  x_minus[2] = MathWrapPi(x[2] + dt * psi_dot);
   x_minus[3] = x[3];
   x_minus[4] = x[4];
   x_minus[5] = x[5];
@@ -249,9 +233,9 @@ void ImuEkfSetEuler(ImuEkfObject *ekf, float roll, float pitch, float yaw)
     return;
   }
 
-  ekf->x_data[0] = EkfWrapPi(roll);
-  ekf->x_data[1] = EkfWrapPi(pitch);
-  ekf->x_data[2] = EkfWrapPi(yaw);
+  ekf->x_data[0] = MathWrapPi(roll);
+  ekf->x_data[1] = MathWrapPi(pitch);
+  ekf->x_data[2] = MathWrapPi(yaw);
   ekf->x_minus_data[0] = ekf->x_data[0];
   ekf->x_minus_data[1] = ekf->x_data[1];
   ekf->x_minus_data[2] = ekf->x_data[2];
@@ -349,9 +333,9 @@ arm_status ImuEkfStep(ImuEkfObject *ekf, const float gyro[kEkfImuInputSize],
   {
     return status;
   }
-  ekf->x_data[0] = EkfWrapPi(ekf->x_data[0]);
-  ekf->x_data[1] = EkfWrapPi(ekf->x_data[1]);
-  ekf->x_data[2] = EkfWrapPi(ekf->x_data[2]);
+  ekf->x_data[0] = MathWrapPi(ekf->x_data[0]);
+  ekf->x_data[1] = MathWrapPi(ekf->x_data[1]);
+  ekf->x_data[2] = MathWrapPi(ekf->x_data[2]);
   status = arm_mat_mult_f32(&ekf->k, &ekf->h, &ekf->temp_xx_1);
   if (status != ARM_MATH_SUCCESS)
   {

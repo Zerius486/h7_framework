@@ -2,23 +2,8 @@
 
 #include <math.h>
 
-/**
- * @brief 将角度归一化到[-pi, pi]
- * @param angle 输入角度（rad）
- * @return 归一化后的角度（rad）
- */
-static float ChassisWrapPi(float angle)
-{
-  while (angle > (float)M_PI)
-  {
-    angle -= 2.0f * (float)M_PI;
-  }
-  while (angle < -(float)M_PI)
-  {
-    angle += 2.0f * (float)M_PI;
-  }
-  return angle;
-}
+#include "alg_conversion.h"
+
 /**
  * @brief 初始化底盘结构体
  * @param chassis 底盘结构体指针
@@ -104,11 +89,11 @@ void ChassisUpdateState(Chassis *chassis)
         float angle_feedback = chassis->has_wheel_angle_feedback
                                    ? chassis->wheel_angle_feedback[i]
                                    : chassis->state.wheel_angle[i];
-        float angle_error = ChassisWrapPi(wheel_angle - angle_feedback);
+        float angle_error = MathWrapPi(wheel_angle - angle_feedback);
         if (fabsf(angle_error) > (float)M_PI / 2.0f)
         {
           chassis->state.wheel_speed[i] = -chassis->state.wheel_speed[i];
-          wheel_angle = ChassisWrapPi(wheel_angle + (float)M_PI);
+          wheel_angle = MathWrapPi(wheel_angle + (float)M_PI);
         }
         chassis->state.wheel_angle[i] = wheel_angle;
       }
