@@ -13,12 +13,12 @@ enum
 // SPI接收回调函数指针
 typedef void (*SpiRxCallback)(uint8_t *rx_buffer, uint16_t rx_length);
 
-// SPI对象结构体
+// SPI对象结构体（DMA缓冲区置前并按32字节Cache Line对齐）
 typedef struct
 {
+  uint8_t rx_buffer[kSpiBufferSize] __attribute__((aligned(32))); // 接收缓冲区
+  uint8_t tx_buffer[kSpiBufferSize] __attribute__((aligned(32))); // 发送缓冲区
   SPI_HandleTypeDef *hspi;           // SPI句柄
-  uint8_t rx_buffer[kSpiBufferSize]; // 接收缓冲区
-  uint8_t tx_buffer[kSpiBufferSize]; // 发送缓冲区
   uint8_t *rx_buffer_user;           // 用户接收缓冲区
   uint16_t transfer_length;          // 当前传输长度
   SpiRxCallback callback;            // 接收回调函数指针

@@ -11,6 +11,7 @@
 #include "app_task.h"
 
 #include "app_config.h"
+#include "bsp_iwdg.h"
 #include "dev_peripheral.h"
 #include "stm32h7xx_hal.h"
 
@@ -21,6 +22,7 @@
 uint32_t ManagerTaskInit(void)
 {
   PeripheralManagerInit();
+  (void)BspIwdgInit(500U);
   return g_app_task_config.manager_period_ms;
 }
 
@@ -39,6 +41,8 @@ void ManagerTaskLoop(void)
   {
     PeripheralManagerEmergencyStopAll();
   }
+
+  BspIwdgFeed();
 }
 
 /**

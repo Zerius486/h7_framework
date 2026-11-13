@@ -219,7 +219,7 @@ SECTIONS
     *(.dma_buffer)
     *(.dma_buffer*)
     . = ALIGN(32);
-  } >RAM_D1
+  } >RAM_D2
 
   .bss (NOLOAD) : ALIGN(4)
   {

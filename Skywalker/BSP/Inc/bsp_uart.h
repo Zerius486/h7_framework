@@ -15,15 +15,15 @@ enum
 // UART接收回调函数指针
 typedef void (*UartRxCallback)(uint8_t *rx_buffer, uint16_t rx_length);
 
-// UART对象结构体
+// UART对象结构体（DMA缓冲区置前并按32字节Cache Line对齐）
 typedef struct
 {
+  uint8_t rx_buffer_0[kUartBufferSize] __attribute__((aligned(32))); // 接收缓冲区0
+  uint8_t rx_buffer_1[kUartBufferSize] __attribute__((aligned(32))); // 接收缓冲区1
+  uint8_t tx_buffer[kUartBufferSize] __attribute__((aligned(32)));   // 发送缓冲区
   UART_HandleTypeDef *huart;            // UART句柄
-  uint8_t rx_buffer_0[kUartBufferSize]; // 接收缓冲区0
-  uint8_t rx_buffer_1[kUartBufferSize]; // 接收缓冲区1
   uint8_t *rx_buffer_active;            // 当前接收缓冲区
   uint8_t *rx_buffer_ready;             // 就绪接收缓冲区
-  uint8_t tx_buffer[kUartBufferSize];   // 发送缓冲区
   UartRxCallback callback;              // 接收回调函数指针
 } UartObject;
 

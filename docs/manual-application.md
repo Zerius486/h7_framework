@@ -6,7 +6,7 @@
 
 | 层 | 职责 |
 | --- | --- |
-| BSP | UART、FDCAN、SPI、流缓存、DMA 与计时封装 |
+| BSP | UART、FDCAN、SPI、IWDG、流缓存、DMA（`RAM_D2` Non-Cacheable）与计时封装 |
 | Device | 电机、遥控器、IMU 驱动与统一外设守护状态机 |
 | Algorithm | 通用控制、估计、滤波、运动学及辨识算法 |
 | Application | 设备配置、通信协议、任务调度与机器人控制逻辑 |
@@ -15,7 +15,7 @@ Device 使用 BSP 通信，也可组合算法；Application 组织设备和控�
 
 启动顺序为外设初始化、内核初始化、`AppConfigInit()`、创建任务、启动调度器，随后执行各任务的 `TaskInit()` 和 `TaskLoop()`。`app_task.c` 用 `osDelayUntil()` 周期调度，当前 RTOS tick 为 1 ms。
 
-常规开发修改 `app_config.h/.c`、`app_robot.c`、`app_protocol.h/.c`，机构复杂时可拆分应用文件。裁判系统解析位于 `app_referee.h/.c`。当前 `AppConfigInit()` 初始化默认关闭的调试记录器；`ManagerTaskInit()` / `ManagerTaskLoop()` 已接入 `PeripheralManager` 轮询与关键外设急停联锁，其余三个任务循环为空，实际设备、控制逻辑和通信接收回调仍需由应用接入。
+常规开发修改 `app_config.h/.c`、`app_robot.c`、`app_protocol.h/.c`，机构复杂时可拆分应用文件。裁判系统解析位于 `app_referee.h/.c`。当前 `AppConfigInit()` 初始化默认关闭的调试记录器；`ManagerTaskInit()` / `ManagerTaskLoop()` 已接入 `PeripheralManager` 轮询、关键外设急停联锁与 500 ms 硬件看门狗（`BspIwdgInit(500U)` / `BspIwdgFeed()`，`DEBUG` 调试暂停时自动冻结计数），其余三个任务循环为空，实际设备、控制逻辑和通信接收回调仍需由应用接入。
 
 ## 1. 配置外设与机构
 
@@ -26,6 +26,13 @@ Device 使用 BSP 通信，也可组合算法；Application 组织设备和控�
 在 `AppConfigInit()` 中直接调用 BSP、设备和算法初始化接口，注册 CAN/UART 接收回调，并调用 `PeripheralManagerRegister(&dev.guard, is_critical)` 登记外设守护。此函数在任务创建前执行；需要任务上下文的初始化放入相应 `TaskInit()`。
 
 方向、减速比和零位可以使用 `AppMotorConfig` 表达。应用按具体驱动反馈的轴侧定义，显式完成机构坐标转换；不要对驱动已经换算过的量重复应用减速比。
+
+### Cache 与 DMA 内存布局
+
+`Core/Src/main.c` 在系统启动时调用 `MPU_Config()` 并同时开启 `I-Cache` 与 `D-Cache`：
+
+- `RAM_D2`（`0x30000000`，`32 KB`）被 MPU 配置为 **Normal Non-Cacheable**（`MPU_TEX_LEVEL1`、`Shareable`），其余区域通过 `MPU_PRIVILEGED_DEFAULT` 保持默认 Cacheable 策略。
+- 链接脚本 `STM32H723XG_FLASH.ld` 将 `.dma_buffer (NOLOAD)` 放置于 `RAM_D2`，`bsp_uart` 与 `bsp_spi` 的 DMA 收发缓冲区置前并按 32 字节对齐。后续新增使用 DMA1/DMA2 的外设缓冲区时，应统一放入 `.dma_buffer` 段（注意 `DMA1/DMA2` 不可访问 `DTCMRAM`）。
 
 ### 外设使能与守护
 
@@ -124,7 +131,7 @@ SteerSpeedCorrect(&chassis.state, angle, angle_scale, drive_speed);
 
 可使用 `bsp_stream.h` 处理分包/粘包，使用 `alg_crc.h` 校验。板间消息、调试观测和整定命令均由应用按需求定义。
 
-裁判系统通过 `RefereePackFrame()` 打包，或通过 `RefereeSend()` 打包并提交 UART DMA 发送。`RefereeSend()` 返回 `true` 表示已提交，不表示传输已完成；串口忙或提交失败时返回 `false`，后续发送时机由应用安排。
+裁判系统协议已按 **RoboMaster 2027 通信协议 V1.0.0** 适配（`0x0001`–`0x0311`，移除了已废弃的 `0x0102`、`0x0205`），通过 `RefereePackFrame()` 打包，或通过 `RefereeSend()` 打包并提交 UART DMA 发送。`RefereeSend()` 返回 `true` 表示已提交，不表示传输已完成；串口忙或提交失败时返回 `false`，后续发送时机由应用安排。默认按高校联盟赛（`RMUL`）编译，可通过 `cmake --preset Debug -DREFEREE_MODE=RMUC` 切换为高校超级对抗赛（`RMUC`），两套模式的差异（如 `0x0101`/`0x0209` 位域及飞镖/雷达专属命令）由 `REFEREE_MODE_RMUL` / `REFEREE_MODE_RMUC` 编译期隔离。
 
 ## 4. 编译与测量
 

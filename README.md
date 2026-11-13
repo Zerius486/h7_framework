@@ -17,6 +17,13 @@ cmake --preset Debug
 cmake --build --preset Debug
 ```
 
+裁判系统默认按高校联盟赛（`RMUL`）协议编译，可通过 `REFEREE_MODE` 手动切换为高校超级对抗赛（`RMUC`）：
+
+```sh
+cmake --preset Debug -DREFEREE_MODE=RMUC
+cmake --build --preset Debug
+```
+
 如果迁移过 STM32CubeCLT 或更换过工具链位置，先删除对应的 `build/Debug/` 或 `build/Release/` 目录，再重新配置。CMake 会从当前 `PATH` 查找 `cmake`、`ninja` 和 `arm-none-eabi-gcc`；工程不保存本机工具链的绝对路径。
 
 发布构建将 `Debug` 替换为 `Release`。生成的 ELF 和链接映射文件位于 `build/Debug/` 或 `build/Release/`。引脚、时钟和外设实例由 `h7_framework.ioc` 管理；重新生成 CubeMX 工程后，检查应用代码及 USER CODE 区域。
@@ -37,7 +44,7 @@ GitHub Actions 工作流位于 [`.github/workflows/ci.yml`](.github/workflows/ci
 | `app_robot.c` | 管理、云台、底盘和发射任务的业务逻辑 |
 | `app_protocol.h/.c` | 应用通信消息、解析和发送 |
 
-当前 `AppConfigInit()` 只初始化调试记录器；`ManagerTask` 已接入 `PeripheralManager` 轮询与关键外设急停联锁，其余三个任务循环为空，任务周期默认 1 ms。接入机器人时，在 `app_config.c` 填写本机配置，在 `AppConfigInit()` 初始化设备、算法、接收回调并调用 `PeripheralManagerRegister()` 登记外设守护，再在 `app_robot.c` 实现任务初始化和周期逻辑。协议按机器人需要在 `app_protocol.h/.c` 实现。单板/双板分工及遥控、视觉、板间控制来源的切换由应用任务负责。
+当前 `AppConfigInit()` 只初始化调试记录器；`ManagerTask` 已接入 `PeripheralManager` 轮询、关键外设急停联锁与 500 ms 硬件看门狗（`bsp_iwdg`），其余三个任务循环为空，任务周期默认 1 ms。接入机器人时，在 `app_config.c` 填写本机配置，在 `AppConfigInit()` 初始化设备、算法、接收回调并调用 `PeripheralManagerRegister()` 登记外设守护，再在 `app_robot.c` 实现任务初始化和周期逻辑。协议按机器人需要在 `app_protocol.h/.c` 实现。单板/双板分工及遥控、视觉、板间控制来源的切换由应用任务负责。
 
 应用层接口使用 SI 单位，例如角度 rad、角速度 rad/s、电流 A、速度 m/s。设备驱动完成协议数值到 SI 单位的换算；机构方向、零位和轴侧转换由应用配置。目标、反馈及限幅须使用相同坐标，算法采样周期须与调用周期相符。
 
@@ -45,10 +52,10 @@ GitHub Actions 工作流位于 [`.github/workflows/ci.yml`](.github/workflows/ci
 
 | 目录 | 内容 |
 | --- | --- |
-| `Skywalker/BSP/` | UART、FDCAN、SPI、流缓存、DMA、周期计时和调试日志 |
+| `Skywalker/BSP/` | UART、FDCAN、SPI、IWDG、流缓存、DMA（`RAM_D2` Non-Cacheable）、周期计时和调试日志 |
 | `Skywalker/Device/` | DJI、DM、LK 电机，DT7 遥控器、BMI088 IMU 驱动及统一外设守护状态机 |
 | `Skywalker/Algorithm/` | PID、DOB、运动学、轨迹、滤波、状态估计、辨识和整定 |
-| `Skywalker/Application/` | 机器人配置、业务任务、应用协议、裁判系统及整定日志适配 |
+| `Skywalker/Application/` | 机器人配置、业务任务、应用协议、裁判系统（2027 V1.0.0 RMUL/RMUC）及整定日志适配 |
 
 支持 DJI M2006、M3508、GM6020，DM J4310/J8009P 和 LK 电机，并内嵌 `PeripheralGuard` 使能、离线超时及故障门控。GM6020 电流控制需在 RoboMaster Assistant 中启用对应模式；J8009P 的量程与外设守护接入说明见[应用开发](docs/manual-application.md)。
 

@@ -62,11 +62,19 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/CMSIS/DSP/PrivateInclude
 )
 
+# 裁判系统通信协议模式切换: RMUL (高校联盟赛，默认) 或 RMUC (高校超级对抗赛)
+set(REFEREE_MODE "RMUL" CACHE STRING "Referee protocol mode: RMUC or RMUL")
+set_property(CACHE REFEREE_MODE PROPERTY STRINGS "RMUC" "RMUL")
+if(NOT REFEREE_MODE STREQUAL "RMUC" AND NOT REFEREE_MODE STREQUAL "RMUL")
+    message(FATAL_ERROR "Invalid REFEREE_MODE='${REFEREE_MODE}'. Expected 'RMUC' or 'RMUL'.")
+endif()
+
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     ARM_MATH_CM7
     ARM_MATH_MATRIX_CHECK
     ARM_MATH_ROUNDING
+    REFEREE_MODE_${REFEREE_MODE}=1
 )
 
 # Remove wrong libob.a library dependency when using cpp files

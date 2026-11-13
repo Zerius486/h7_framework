@@ -57,7 +57,7 @@
 void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void MPU_Config(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -73,13 +73,17 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  /* 配置 MPU：将 RAM_D2 (.dma_buffer) 设为 Non-Cacheable，保障 DMA 与 D-Cache 一致性 */
+  MPU_Config();
   /* USER CODE END 1 */
 
   /* Enable the CPU Cache */
 
   /* Enable I-Cache---------------------------------------------------------*/
   SCB_EnableICache();
+
+  /* Enable D-Cache---------------------------------------------------------*/
+  SCB_EnableDCache();
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -194,7 +198,31 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+/**
+  * @brief  配置 MPU 区域：RAM_D2 (0x30000000, 32KB) 设为 Normal Non-Cacheable
+  * @retval None
+  */
+static void MPU_Config(void)
+{
+  MPU_Region_InitTypeDef mpu_init = {0};
 
+  HAL_MPU_Disable();
+
+  mpu_init.Enable = MPU_REGION_ENABLE;
+  mpu_init.Number = MPU_REGION_NUMBER0;
+  mpu_init.BaseAddress = 0x30000000U;
+  mpu_init.Size = MPU_REGION_SIZE_32KB;
+  mpu_init.SubRegionDisable = 0x00U;
+  mpu_init.TypeExtField = MPU_TEX_LEVEL1;
+  mpu_init.AccessPermission = MPU_REGION_FULL_ACCESS;
+  mpu_init.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
+  mpu_init.IsShareable = MPU_ACCESS_SHAREABLE;
+  mpu_init.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+  mpu_init.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+
+  HAL_MPU_ConfigRegion(&mpu_init);
+  HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
+}
 /* USER CODE END 4 */
 
 /**

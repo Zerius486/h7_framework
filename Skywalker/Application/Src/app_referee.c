@@ -5,6 +5,43 @@
 #include "alg_crc.h"
 #include "stm32h7xx_hal.h"
 
+// 编译期校验 2027 V1.0.0 协议所有线协议结构体字节长度
+_Static_assert(sizeof(RefereeFrameHeader) == 5U, "RefereeFrameHeader size mismatch");
+_Static_assert(sizeof(RefereeGameState) == 11U, "RefereeGameState size mismatch");
+_Static_assert(sizeof(RefereeGameResult) == 1U, "RefereeGameResult size mismatch");
+_Static_assert(sizeof(RefereeGameRobotHp) == 24U, "RefereeGameRobotHp size mismatch");
+_Static_assert(sizeof(RefereeEventData) == 8U, "RefereeEventData size mismatch");
+_Static_assert(sizeof(RefereeWarning) == 3U, "RefereeWarning size mismatch");
+_Static_assert(sizeof(RefereeGameRobotState) == 17U, "RefereeGameRobotState size mismatch");
+_Static_assert(sizeof(RefereePowerHeatData) == 14U, "RefereePowerHeatData size mismatch");
+_Static_assert(sizeof(RefereeGameRobotPosition) == 12U, "RefereeGameRobotPosition size mismatch");
+_Static_assert(sizeof(RefereeBuff) == 7U, "RefereeBuff size mismatch");
+_Static_assert(sizeof(RefereeRobotHurt) == 7U, "RefereeRobotHurt size mismatch");
+_Static_assert(sizeof(RefereeShootData) == 7U, "RefereeShootData size mismatch");
+_Static_assert(sizeof(RefereeProjectileAllowance) == 8U, "RefereeProjectileAllowance size mismatch");
+_Static_assert(sizeof(RefereeRfidStatus) == 6U, "RefereeRfidStatus size mismatch");
+_Static_assert(sizeof(RefereeGroundRobotPosition) == 40U, "RefereeGroundRobotPosition size mismatch");
+_Static_assert(sizeof(RefereeSentryInfo) == 14U, "RefereeSentryInfo size mismatch");
+_Static_assert(sizeof(RefereeInteractiveHeader) == 6U, "RefereeInteractiveHeader size mismatch");
+_Static_assert(sizeof(RefereeInteractionLayerDelete) == 2U, "RefereeInteractionLayerDelete size mismatch");
+_Static_assert(sizeof(RefereeGraphicDataStruct) == 15U, "RefereeGraphicDataStruct size mismatch");
+_Static_assert(sizeof(RefereeInteractionFigure2) == 30U, "RefereeInteractionFigure2 size mismatch");
+_Static_assert(sizeof(RefereeInteractionFigure5) == 75U, "RefereeInteractionFigure5 size mismatch");
+_Static_assert(sizeof(RefereeInteractionFigure7) == 105U, "RefereeInteractionFigure7 size mismatch");
+_Static_assert(sizeof(RefereeInteractionCharacter) == 45U, "RefereeInteractionCharacter size mismatch");
+_Static_assert(sizeof(RefereeSentryCmd) == 4U, "RefereeSentryCmd size mismatch");
+_Static_assert(sizeof(RefereeRadarCmd) == 13U, "RefereeRadarCmd size mismatch");
+_Static_assert(sizeof(RefereeMapCommand) == 12U, "RefereeMapCommand size mismatch");
+_Static_assert(sizeof(RefereeMapRobotData) == 48U, "RefereeMapRobotData size mismatch");
+_Static_assert(sizeof(RefereeMapData) == 105U, "RefereeMapData size mismatch");
+_Static_assert(sizeof(RefereeCustomInfo) == 34U, "RefereeCustomInfo size mismatch");
+#if defined(REFEREE_MODE_RMUC)
+_Static_assert(sizeof(RefereeDartInfo) == 3U, "RefereeDartInfo size mismatch");
+_Static_assert(sizeof(RefereeDartClientCmd) == 6U, "RefereeDartClientCmd size mismatch");
+_Static_assert(sizeof(RefereeRadarMarkData) == 2U, "RefereeRadarMarkData size mismatch");
+_Static_assert(sizeof(RefereeRadarInfo) == 8U, "RefereeRadarInfo size mismatch");
+#endif
+
 RefereeObject g_referee = {0};
 
 /**
@@ -234,11 +271,16 @@ void RefereeUpdate(RefereeObject *referee)
       RefereeCopyData(&referee->event_data, sizeof(referee->event_data), data,
                       data_length);
       break;
-    case kRefereeCmdSupplyProjectileAction:
-      RefereeCopyData(&referee->supply_projectile_action,
-                      sizeof(referee->supply_projectile_action), data,
+    case kRefereeCmdRefereeWarning:
+      RefereeCopyData(&referee->referee_warning,
+                      sizeof(referee->referee_warning), data, data_length);
+      break;
+#if defined(REFEREE_MODE_RMUC)
+    case kRefereeCmdDartInfo:
+      RefereeCopyData(&referee->dart_info, sizeof(referee->dart_info), data,
                       data_length);
       break;
+#endif
     case kRefereeCmdGameRobotState:
       RefereeCopyData(&referee->game_robot_state,
                       sizeof(referee->game_robot_state), data, data_length);
@@ -254,10 +296,6 @@ void RefereeUpdate(RefereeObject *referee)
     case kRefereeCmdBuff:
       RefereeCopyData(&referee->buff, sizeof(referee->buff), data, data_length);
       break;
-    case kRefereeCmdAerialRobotEnergy:
-      RefereeCopyData(&referee->aerial_robot_energy,
-                      sizeof(referee->aerial_robot_energy), data, data_length);
-      break;
     case kRefereeCmdRobotHurt:
       RefereeCopyData(&referee->robot_hurt, sizeof(referee->robot_hurt), data,
                       data_length);
@@ -270,6 +308,37 @@ void RefereeUpdate(RefereeObject *referee)
       RefereeCopyData(&referee->projectile_allowance,
                       sizeof(referee->projectile_allowance), data, data_length);
       break;
+    case kRefereeCmdRfidStatus:
+      RefereeCopyData(&referee->rfid_status, sizeof(referee->rfid_status), data,
+                      data_length);
+      break;
+#if defined(REFEREE_MODE_RMUC)
+    case kRefereeCmdDartClientCmd:
+      RefereeCopyData(&referee->dart_client_cmd,
+                      sizeof(referee->dart_client_cmd), data, data_length);
+      break;
+#endif
+    case kRefereeCmdGroundRobotPosition:
+      RefereeCopyData(&referee->ground_robot_position,
+                      sizeof(referee->ground_robot_position), data,
+                      data_length);
+      break;
+#if defined(REFEREE_MODE_RMUC)
+    case kRefereeCmdRadarMarkData:
+      RefereeCopyData(&referee->radar_mark_data,
+                      sizeof(referee->radar_mark_data), data, data_length);
+      break;
+#endif
+    case kRefereeCmdSentryInfo:
+      RefereeCopyData(&referee->sentry_info, sizeof(referee->sentry_info), data,
+                      data_length);
+      break;
+#if defined(REFEREE_MODE_RMUC)
+    case kRefereeCmdRadarInfo:
+      RefereeCopyData(&referee->radar_info, sizeof(referee->radar_info), data,
+                      data_length);
+      break;
+#endif
     case kRefereeCmdStudentInteractive:
     {
       if (data_length >= sizeof(referee->interactive_header))
@@ -286,6 +355,44 @@ void RefereeUpdate(RefereeObject *referee)
                &data[sizeof(referee->interactive_header)], payload_length);
         referee->interactive_data.length = payload_length;
       }
+      break;
+    }
+    case kRefereeCmdMapCommand:
+      RefereeCopyData(&referee->map_command, sizeof(referee->map_command), data,
+                      data_length);
+      break;
+    case kRefereeCmdMapRobotData:
+      RefereeCopyData(&referee->map_robot_data, sizeof(referee->map_robot_data),
+                      data, data_length);
+      break;
+    case kRefereeCmdMapData:
+      RefereeCopyData(&referee->map_data, sizeof(referee->map_data), data,
+                      data_length);
+      break;
+    case kRefereeCmdCustomInfo:
+      RefereeCopyData(&referee->custom_info, sizeof(referee->custom_info), data,
+                      data_length);
+      break;
+    case kRefereeCmdCustomRobotData:
+    {
+      uint16_t copy_length = data_length;
+      if (copy_length > kRefereeCustomDataMaxLength)
+      {
+        copy_length = kRefereeCustomDataMaxLength;
+      }
+      memcpy(referee->custom_robot_data.data, data, copy_length);
+      referee->custom_robot_data.length = copy_length;
+      break;
+    }
+    case kRefereeCmdCustomRobotCmd:
+    {
+      uint16_t copy_length = data_length;
+      if (copy_length > kRefereeCustomCmdMaxLength)
+      {
+        copy_length = kRefereeCustomCmdMaxLength;
+      }
+      memcpy(referee->custom_robot_cmd.data, data, copy_length);
+      referee->custom_robot_cmd.length = copy_length;
       break;
     }
     default:
