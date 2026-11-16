@@ -1,5 +1,6 @@
 #include "dev_dm_motor.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "alg_conversion.h"
@@ -40,6 +41,12 @@ static void DmMotorGuardResyncHook(void *device_ptr)
   motor->state.given_torque = 0.0f;
   motor->state.kp = 0.0f;
   motor->state.kd = 0.0f;
+  DmMotorResetUnwrap(motor);
+}
+
+static void DmMotorGuardOfflineHook(void *device_ptr)
+{
+  DmMotorGuardResyncHook(device_ptr);
 }
 
 /**
@@ -168,7 +175,7 @@ void DmMotorInit(DmMotor *motor, DmMotorType type, DmMotorMode mode,
   PeripheralOps ops = {
       .on_enable = DmMotorGuardEnableHook,
       .on_disable = DmMotorGuardDisableHook,
-      .on_offline = DmMotorGuardDisableHook,
+      .on_offline = DmMotorGuardOfflineHook,
       .on_resync = DmMotorGuardResyncHook,
       .on_clear_fault = NULL,
       .on_reconnect_probe = NULL,
@@ -178,7 +185,23 @@ void DmMotorInit(DmMotor *motor, DmMotorType type, DmMotorMode mode,
 }
 
 /**
- * @brief 更新达妙电机反馈数据
+ * @brief 重置达妙电机多圈展开状态（离线重连或重设零点后调用）
+ * @param motor 达妙电机对象指针
+ */
+void DmMotorResetUnwrap(DmMotor *motor)
+{
+  if (motor == NULL)
+  {
+    return;
+  }
+  motor->state.wraps = 0;
+  motor->state.previous_raw_angle = 0.0f;
+  motor->state.continuous_angle = 0.0;
+  motor->state.angle_initialized = false;
+}
+
+/**
+ * @brief 更新达妙电机反馈数据并按协议跨度 (2 * position_max) 做多圈展开
  * @param motor 达妙电机对象指针
  * @param rx_data CAN反馈数据，长度8字节
  */
@@ -197,8 +220,8 @@ void DmMotorUpdate(DmMotor *motor, const uint8_t rx_data[8])
       (uint16_t)((((uint16_t)rx_data[4] & 0x0FU) << 8) | (uint16_t)rx_data[5]);
 
   motor->state.error_code = (uint8_t)(rx_data[0] >> 4);
-  motor->state.angle = DmMotorUintToFloat(position, -motor->limits.position_max,
-                                          motor->limits.position_max, 16);
+  float raw_angle = DmMotorUintToFloat(position, -motor->limits.position_max,
+                                       motor->limits.position_max, 16);
   motor->state.omega = DmMotorUintToFloat(velocity, -motor->limits.velocity_max,
                                           motor->limits.velocity_max, 12);
   motor->state.torque = DmMotorUintToFloat(torque, -motor->limits.torque_max,
@@ -213,11 +236,46 @@ void DmMotorUpdate(DmMotor *motor, const uint8_t rx_data[8])
   if (motor->state.error_code >= 0x08U)
   {
     PeripheralGuardTriggerFault(&motor->guard, motor->state.error_code);
+    // 故障帧不更新多圈展开计数，避免坏帧污染 wraps
+    return;
   }
   else if (PeripheralIsFault(&motor->guard))
   {
     PeripheralGuardClearFault(&motor->guard);
   }
+
+  float half_span = motor->limits.position_max;
+  if (!isfinite(half_span) || half_span <= 0.0f || !isfinite(raw_angle) ||
+      raw_angle < -half_span || raw_angle > half_span)
+  {
+    return;
+  }
+
+  motor->state.raw_angle = raw_angle;
+  if (!motor->state.angle_initialized)
+  {
+    motor->state.wraps = 0;
+    motor->state.previous_raw_angle = raw_angle;
+    motor->state.continuous_angle = (double)raw_angle;
+    motor->state.angle_initialized = true;
+  }
+  else
+  {
+    double span = 2.0 * (double)half_span;
+    double delta = (double)raw_angle - (double)motor->state.previous_raw_angle;
+    if (delta < -(double)half_span)
+    {
+      motor->state.wraps += 1;
+    }
+    else if (delta > (double)half_span)
+    {
+      motor->state.wraps -= 1;
+    }
+    motor->state.continuous_angle =
+        (double)raw_angle + (double)motor->state.wraps * span;
+    motor->state.previous_raw_angle = raw_angle;
+  }
+  motor->state.angle = (float)motor->state.continuous_angle;
 }
 
 /**

@@ -52,7 +52,7 @@ static void EkfPredictModelAndJacobian(ImuEkfObject *ekf,
   const float sin_phi = sinf(phi);
   const float cos_phi = cosf(phi);
   const float cos_theta = EkfSafeCos(theta);
-  const float tan_theta = tanf(theta);
+  const float tan_theta = sinf(theta) / cos_theta;
   const float sec_theta = 1.0f / cos_theta;
   const float sec_theta2 = sec_theta * sec_theta;
   const float p = gyro[0] - x[3];
@@ -425,8 +425,9 @@ void ImuEkfGetState(const ImuEkfObject *ekf, Euler *euler,
     const float r = ekf->corrected_gyro_data[2];
     const float sin_phi = sinf(phi);
     const float cos_phi = cosf(phi);
-    const float tan_theta = tanf(theta);
-    const float sec_theta = 1.0f / EkfSafeCos(theta);
+    const float cos_theta = EkfSafeCos(theta);
+    const float tan_theta = sinf(theta) / cos_theta;
+    const float sec_theta = 1.0f / cos_theta;
     euler_rate->roll_rate =
         p + q * sin_phi * tan_theta + r * cos_phi * tan_theta;
     euler_rate->pitch_rate = q * cos_phi - r * sin_phi;

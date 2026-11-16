@@ -31,6 +31,7 @@ bool SysidInit(SysidObject *sysid, const SysidConfig *config)
     sysid->covariance[i][i] = 10000.0f;
     sysid->information[i][i] = 0.0001;
   }
+  sysid->initialized = true;
   return true;
 }
 
@@ -326,7 +327,8 @@ static bool SysidSubspaceUpdate(SysidObject *sysid, const float x[4],
  */
 bool SysidUpdate(SysidObject *sysid, float current, float omega)
 {
-  if (sysid == NULL || !isfinite(current) || !isfinite(omega))
+  if (sysid == NULL || !sysid->initialized || !isfinite(current) ||
+      !isfinite(omega))
   {
     return false;
   }

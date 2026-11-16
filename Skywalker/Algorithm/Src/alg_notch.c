@@ -29,7 +29,7 @@ void NotchFilterInit(NotchFilterObject *notch_filter, float f0, float q,
     notch_filter->y2 = 0.0f;
     return;
   }
-  float w0 = 2.0f * M_PI * f0 / fs;
+  float w0 = 2.0f * (float)M_PI * f0 / fs;
   float alpha = sinf(w0) / (2.0f * q);
   float cos_w0 = cosf(w0);
   float a0 = 1.0f + alpha;

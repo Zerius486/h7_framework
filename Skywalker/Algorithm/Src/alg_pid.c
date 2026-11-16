@@ -40,7 +40,10 @@ bool PidSetGains(PidObject *pid_object, float kp, float ki, float kd)
   pid_object->error_sum = ki > 0.0f ? integral / ki : 0.0f;
   if (ki > 0.0f && pid_object->is_antiwindup_enabled)
   {
-    pid_object->integral_max = integral_limit / ki;
+    if (integral_limit > 0.0f)
+    {
+      pid_object->integral_max = integral_limit / ki;
+    }
     pid_object->error_sum =
         MathClamp(pid_object->error_sum, -pid_object->integral_max,
                   pid_object->integral_max);
@@ -80,6 +83,7 @@ void PidReset(PidObject *pid_object)
   {
     return;
   }
+  pid_object->has_sample = false;
   pid_object->reference = 0.0f;
   pid_object->feedback = 0.0f;
   pid_object->error = 0.0f;
@@ -133,17 +137,28 @@ float PidCalculate(PidObject *pid_object, float reference, float feedback)
   {
     return 0.0f;
   }
-  if (!pid_object->is_enabled || pid_object->sampling_time <= 0.0f)
+  if (!pid_object->is_enabled || pid_object->sampling_time <= 0.0f ||
+      !isfinite(reference) || !isfinite(feedback))
   {
     pid_object->output = 0.0f;
     return 0.0f;
   }
-  // 更新控制器状态
-  pid_object->previous_reference = pid_object->reference;
-  pid_object->previous_feedback = pid_object->feedback;
+  float current_error = reference - feedback;
+  if (!pid_object->has_sample)
+  {
+    pid_object->has_sample = true;
+    pid_object->previous_reference = reference;
+    pid_object->previous_feedback = feedback;
+    pid_object->previous_error = current_error;
+  }
+  else
+  {
+    pid_object->previous_reference = pid_object->reference;
+    pid_object->previous_feedback = pid_object->feedback;
+  }
   pid_object->reference = reference;
   pid_object->feedback = feedback;
-  pid_object->error = reference - feedback;
+  pid_object->error = current_error;
   float p_out = pid_object->kp * pid_object->error;
   float d_out = 0.0f;
   // 微分先行
@@ -190,10 +205,6 @@ float PidCalculate(PidObject *pid_object, float reference, float feedback)
            pid_object->error < 0.0f))
       {
         is_integral_updated = false;
-      }
-      if (pid_object->error * pid_object->previous_error < 0)
-      {
-        pid_object->error_sum *= 0.90f;
       }
     }
     if (is_integral_updated)

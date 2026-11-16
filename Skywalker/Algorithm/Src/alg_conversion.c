@@ -2,6 +2,12 @@
 
 #include "math.h"
 #include "stdint.h"
+static const float kTwoPiF = 2.0f * (float)M_PI;
+static const float kRpmToRadS = (float)M_PI / 30.0f;
+static const float kRadSToRpm = 30.0f / (float)M_PI;
+static const float kRadToDeg = 180.0f / (float)M_PI;
+static const float kDegToRad = (float)M_PI / 180.0f;
+
 /**
  * @brief 将转速从转每分钟转换为弧度每秒
  * @param rpm 转速（r/min）
@@ -9,7 +15,7 @@
  */
 float RpmToRadS(float rpm)
 {
-  return rpm * M_PI / 30.0f;
+  return rpm * kRpmToRadS;
 }
 /**
  * @brief 将角速度从弧度每秒转换为转每分钟
@@ -18,7 +24,7 @@ float RpmToRadS(float rpm)
  */
 float RadSToRpm(float rad_s)
 {
-  return rad_s * 30.0f / M_PI;
+  return rad_s * kRadSToRpm;
 }
 /**
  * @brief 将编码器值转换为弧度
@@ -27,7 +33,7 @@ float RadSToRpm(float rad_s)
  */
 float EncoderToRadian(uint16_t encoder_value)
 {
-  return (float)(encoder_value) / 8192.0f * 2.0f * M_PI;
+  return (float)(encoder_value & 0x1FFFU) * (kTwoPiF / 8192.0f);
 }
 /**
  * @brief 将弧度转换为编码器值
@@ -36,7 +42,12 @@ float EncoderToRadian(uint16_t encoder_value)
  */
 uint16_t RadianToEncoder(float radian)
 {
-  return (uint16_t)((radian / (2.0f * M_PI)) * 8192.0f);
+  if (!isfinite(radian))
+  {
+    return 0U;
+  }
+  float wrapped = MathWrap2Pi(radian);
+  return (uint16_t)(wrapped * (8192.0f / kTwoPiF)) & 0x1FFFU;
 }
 /**
  * @brief 将弧度转换为角度
@@ -45,7 +56,7 @@ uint16_t RadianToEncoder(float radian)
  */
 float RadianToDegree(float radian)
 {
-  return radian * 180.0f / M_PI;
+  return radian * kRadToDeg;
 }
 /**
  * @brief 将角度转换为弧度
@@ -54,7 +65,7 @@ float RadianToDegree(float radian)
  */
 float DegreeToRadian(float degree)
 {
-  return degree * M_PI / 180.0f;
+  return degree * kDegToRad;
 }
 /**
  * @brief 将编码器值转换为角度
@@ -63,7 +74,7 @@ float DegreeToRadian(float degree)
  */
 float EncoderToDegree(uint16_t encoder_value)
 {
-  return (float)(encoder_value) / 8192.0f * 360.0f;
+  return (float)(encoder_value & 0x1FFFU) * (360.0f / 8192.0f);
 }
 /**
  * @brief 将角度转换为编码器值
@@ -72,5 +83,14 @@ float EncoderToDegree(uint16_t encoder_value)
  */
 uint16_t DegreeToEncoder(float degree)
 {
-  return (uint16_t)(degree * 8192.0f / 360.0f);
+  if (!isfinite(degree))
+  {
+    return 0U;
+  }
+  float wrapped = fmodf(degree, 360.0f);
+  if (wrapped < 0.0f)
+  {
+    wrapped += 360.0f;
+  }
+  return (uint16_t)(wrapped * (8192.0f / 360.0f)) & 0x1FFFU;
 }

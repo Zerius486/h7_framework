@@ -72,7 +72,13 @@ typedef struct
   uint32_t master_id; // 电机反馈ID
   uint8_t error_code; // 电机错误码
 
-  float angle;             // 当前角度（rad）
+  float raw_angle;         // 当前协议原始角度（rad，[-position_max, +position_max]）
+  float previous_raw_angle;// 上一帧协议原始角度（rad）
+  double continuous_angle; // 多圈展开后的连续角度（rad，双精度防多圈精度损失）
+  int32_t wraps;           // 协议边界跨圈计数（以 2 * position_max 为周期）
+  bool angle_initialized;  // 多圈展开初始化标志
+
+  float angle;             // 当前连续角度（rad，由 continuous_angle 转换）
   float omega;             // 当前角速度（rad/s）
   float torque;            // 当前力矩（Nm）
   float temperature_mos;   // MOS温度（℃）
@@ -105,6 +111,7 @@ float DmMotorCurrentUnitsToTorque(float current_units);
 uint32_t DmMotorTxId(const DmMotor *motor);
 void DmMotorInit(DmMotor *motor, DmMotorType type, DmMotorMode mode,
                  uint32_t id, uint32_t master_id);
+void DmMotorResetUnwrap(DmMotor *motor);
 void DmMotorUpdate(DmMotor *motor, const uint8_t rx_data[8]);
 void DmMotorPackCommand(DmMotor *motor, DmMotorCommand command,
                         uint8_t tx_data[8]);

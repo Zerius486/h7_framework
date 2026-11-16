@@ -78,7 +78,7 @@ float Lpf2ndUpdate(Lpf2ndObject *lpf_2nd, float input)
   float output =
       lpf_2nd->alpha_1 * input + lpf_2nd->alpha_2 * lpf_2nd->prev_input_1 +
       (1.0f - lpf_2nd->alpha_1 - lpf_2nd->alpha_2) * lpf_2nd->prev_input_2;
-  lpf_2nd->prev_input_1 = lpf_2nd->prev_input_2;
-  lpf_2nd->prev_input_2 = output;
+  lpf_2nd->prev_input_2 = lpf_2nd->prev_input_1;
+  lpf_2nd->prev_input_1 = output;
   return output;
 }

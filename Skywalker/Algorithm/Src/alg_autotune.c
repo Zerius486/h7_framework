@@ -402,11 +402,13 @@ static float AutotuneExcite(AutotuneObject *tune, float position, float omega)
   }
   // 仅测试期间按运动余量限制激励。
   float margin = 0.1f * span;
-  if (position < tune->config.position_min + margin && omega < 0.0f)
+  if (position < tune->config.position_min + margin &&
+      (omega < 0.0f || request < 0.0f))
   {
     request = tune->config.current_limit;
   }
-  else if (position > tune->config.position_max - margin && omega > 0.0f)
+  else if (position > tune->config.position_max - margin &&
+           (omega > 0.0f || request > 0.0f))
   {
     request = -tune->config.current_limit;
   }
@@ -744,6 +746,14 @@ float AutotuneUpdate(AutotuneObject *tune, float position, float omega,
         }
         else
         {
+          if (tune->state == kAutotuneSpeed && tune->config.optimize &&
+              tune->optimizer.result.kp > 0.0f)
+          {
+            (void)PidSetGains(&tune->speed_pid, tune->optimizer.result.kp,
+                              tune->optimizer.result.ki, 0.0f);
+            tune->result.speed_kp = tune->speed_pid.kp;
+            tune->result.speed_ki = tune->speed_pid.ki;
+          }
           return AutotuneFail(tune, kAutotuneTrackingError);
         }
       }

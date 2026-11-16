@@ -5,6 +5,7 @@
 typedef struct
 {
   bool is_enabled;                      // PID使能标志
+  bool has_sample;                      // 是否已有历史采样
   float kp;                             // 比例增益
   float ki;                             // 积分增益
   float kd;                             // 微分增益

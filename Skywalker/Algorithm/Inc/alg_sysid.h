@@ -84,6 +84,7 @@ typedef struct
   uint32_t rejected_windows;
   uint8_t history_index;
   uint8_t history_count;
+  bool initialized;
   bool sliding_window;
   SysidStatus validation_status;
 } SysidObject;

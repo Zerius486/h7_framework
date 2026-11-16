@@ -16,7 +16,7 @@ Euler QuaternionToEuler(Quaternion q)
   // 计算俯仰角
   float sp = 2.0f * (q.w * q.y - q.z * q.x);
   if (fabsf(sp) >= 1.0f)
-    euler.pitch = copysignf(M_PI / 2.0f, sp);
+    euler.pitch = copysignf((float)M_PI / 2.0f, sp);
   else
     euler.pitch = asinf(sp);
   // 计算偏航角
