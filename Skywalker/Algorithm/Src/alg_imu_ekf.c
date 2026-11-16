@@ -119,7 +119,8 @@ static void EkfMeasurementModelAndJacobian(ImuEkfObject *ekf)
 int8_t ImuEkfInit(ImuEkfObject *ekf, float dt, float gravity)
 {
   uint8_t i;
-  if ((ekf == NULL) || (dt <= 0.0f))
+  if ((ekf == NULL) || !isfinite(dt) || (dt <= 0.0f) ||
+      (isfinite(gravity) && gravity <= 0.0f) || !isfinite(gravity))
   {
     return -1;
   }
@@ -257,6 +258,13 @@ arm_status ImuEkfStep(ImuEkfObject *ekf, const float gyro[kEkfImuInputSize],
   {
     return ARM_MATH_ARGUMENT_ERROR;
   }
+  for (i = 0; i < kEkfImuInputSize; i++)
+  {
+    if (!isfinite(gyro[i]) || !isfinite(accel[i]))
+    {
+      return ARM_MATH_ARGUMENT_ERROR;
+    }
+  }
   EkfPredictModelAndJacobian(ekf, gyro);
   status = arm_mat_trans_f32(&ekf->f, &ekf->f_t);
   if (status != ARM_MATH_SUCCESS)
@@ -349,6 +357,26 @@ arm_status ImuEkfStep(ImuEkfObject *ekf, const float gyro[kEkfImuInputSize],
   status = arm_mat_mult_f32(&ekf->temp_xx_2, &ekf->p_minus, &ekf->p);
   if (status == ARM_MATH_SUCCESS)
   {
+    // 对称化协方差阵并限制不可观测方向（如 yaw / bz）协方差无界增长
+    for (uint8_t r = 0U; r < kEkfImuStateSize; ++r)
+    {
+      uint8_t diag_idx = (uint8_t)(r * kEkfImuStateSize + r);
+      if (ekf->p_data[diag_idx] > 1.0e4f)
+      {
+        ekf->p_data[diag_idx] = 1.0e4f;
+      }
+      else if (ekf->p_data[diag_idx] < 1.0e-9f)
+      {
+        ekf->p_data[diag_idx] = 1.0e-9f;
+      }
+      for (uint8_t c = (uint8_t)(r + 1U); c < kEkfImuStateSize; ++c)
+      {
+        float sym = 0.5f * (ekf->p_data[r * kEkfImuStateSize + c] +
+                            ekf->p_data[c * kEkfImuStateSize + r]);
+        ekf->p_data[r * kEkfImuStateSize + c] = sym;
+        ekf->p_data[c * kEkfImuStateSize + r] = sym;
+      }
+    }
     ekf->corrected_gyro_data[0] = gyro[0] - ekf->x_data[3];
     ekf->corrected_gyro_data[1] = gyro[1] - ekf->x_data[4];
     ekf->corrected_gyro_data[2] = gyro[2] - ekf->x_data[5];

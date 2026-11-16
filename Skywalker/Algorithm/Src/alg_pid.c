@@ -21,15 +21,15 @@ bool PidSetGains(PidObject *pid_object, float kp, float ki, float kd)
     return false;
   }
   float slope = pid_object->is_derivativeonfeedback_enabled
-                    ? -(pid_object->feedback - pid_object->previous_feedback) /
-                          pid_object->sampling_time
-                    : (pid_object->error - pid_object->previous_error) /
-                          pid_object->sampling_time;
+                    ? -(pid_object->feedback - pid_object->previous_feedback) *
+                          pid_object->inv_dt
+                    : (pid_object->error - pid_object->previous_error) *
+                          pid_object->inv_dt;
   float feedforward =
       pid_object->is_feedforward_enabled
           ? pid_object->kff *
-                (pid_object->reference - pid_object->previous_reference) /
-                pid_object->sampling_time
+                (pid_object->reference - pid_object->previous_reference) *
+                pid_object->inv_dt
           : 0.0f;
   float integral =
       pid_object->output - kp * pid_object->error - kd * slope - feedforward;
@@ -68,9 +68,12 @@ void PidTrackOutput(PidObject *pid_object, float output_difference,
   }
   float fraction = fminf(tracking_rate * pid_object->sampling_time, 1.0f);
   pid_object->error_sum += fraction * output_difference / pid_object->ki;
-  pid_object->error_sum =
-      MathClamp(pid_object->error_sum, -pid_object->integral_max,
-                pid_object->integral_max);
+  if (pid_object->is_antiwindup_enabled && pid_object->integral_max > 0.0f)
+  {
+    pid_object->error_sum =
+        MathClamp(pid_object->error_sum, -pid_object->integral_max,
+                  pid_object->integral_max);
+  }
 }
 
 /**
@@ -104,11 +107,19 @@ void PidInit(PidObject *pid_object, PidConfig *pid_config)
   {
     return;
   }
-  pid_object->is_enabled = true;
+  bool valid = isfinite(pid_config->kp) && isfinite(pid_config->ki) &&
+               isfinite(pid_config->kd) && isfinite(pid_config->sampling_time) &&
+               isfinite(pid_config->output_max) &&
+               isfinite(pid_config->integral_max) &&
+               pid_config->sampling_time > 0.0f &&
+               pid_config->output_max >= 0.0f &&
+               pid_config->integral_max >= 0.0f;
+  pid_object->is_enabled = valid;
   pid_object->kp = pid_config->kp;
   pid_object->ki = pid_config->ki;
   pid_object->kd = pid_config->kd;
   pid_object->sampling_time = pid_config->sampling_time;
+  pid_object->inv_dt = valid ? (1.0f / pid_config->sampling_time) : 0.0f;
   PidReset(pid_object);
   pid_object->is_derivativeonfeedback_enabled =
       pid_config->is_derivativeonfeedback_enabled;
@@ -165,21 +176,21 @@ float PidCalculate(PidObject *pid_object, float reference, float feedback)
   if (pid_object->is_derivativeonfeedback_enabled)
   {
     d_out = -pid_object->kd *
-            (pid_object->feedback - pid_object->previous_feedback) /
-            pid_object->sampling_time;
+            (pid_object->feedback - pid_object->previous_feedback) *
+            pid_object->inv_dt;
   }
   else
   {
-    d_out = pid_object->kd * (pid_object->error - pid_object->previous_error) /
-            pid_object->sampling_time;
+    d_out = pid_object->kd * (pid_object->error - pid_object->previous_error) *
+            pid_object->inv_dt;
   }
   // 前馈计算
   float ff_out = 0.0f;
   if (pid_object->is_feedforward_enabled)
   {
     ff_out = pid_object->kff *
-             (pid_object->reference - pid_object->previous_reference) /
-             pid_object->sampling_time;
+             (pid_object->reference - pid_object->previous_reference) *
+             pid_object->inv_dt;
   }
   // 积分分离逻辑
   bool is_integral_separate = false;

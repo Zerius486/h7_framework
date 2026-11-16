@@ -1,6 +1,7 @@
 #include "alg_median.h"
 
-#include "string.h"
+#include <math.h>
+#include <stddef.h>
 /**
  * @brief 对两个值进行排序
  * @param a 第一个值指针
@@ -22,13 +23,16 @@ static void MedianSort2(float *a, float *b)
  */
 void MedianFilterInit(MedianFilterObject *filter, float initial_value)
 {
+  if (filter == NULL)
+  {
+    return;
+  }
+  float init_val = isfinite(initial_value) ? initial_value : 0.0f;
   filter->index = 0;
-  memset(filter->buffer, 0, sizeof(filter->buffer));
-  filter->buffer[0] = initial_value;
-  filter->buffer[1] = initial_value;
-  filter->buffer[2] = initial_value;
-  filter->buffer[3] = initial_value;
-  filter->buffer[4] = initial_value;
+  for (uint8_t i = 0; i < kMedianWindowSize; ++i)
+  {
+    filter->buffer[i] = init_val;
+  }
 }
 /**
  * @brief 更新中值滤波器并获取当前中值
@@ -38,8 +42,22 @@ void MedianFilterInit(MedianFilterObject *filter, float initial_value)
  */
 float MedianFilterUpdate(MedianFilterObject *filter, float value)
 {
-  filter->buffer[filter->index] = value;
-  filter->index = (filter->index + 1) % kMedianWindowSize;
+  if (filter == NULL)
+  {
+    return value;
+  }
+  if (filter->index >= kMedianWindowSize)
+  {
+    filter->index = 0;
+  }
+  if (isfinite(value))
+  {
+    filter->buffer[filter->index] = value;
+    if (++filter->index >= kMedianWindowSize)
+    {
+      filter->index = 0;
+    }
+  }
   float s0 = filter->buffer[0];
   float s1 = filter->buffer[1];
   float s2 = filter->buffer[2];

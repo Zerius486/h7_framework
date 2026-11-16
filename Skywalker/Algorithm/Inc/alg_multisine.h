@@ -26,6 +26,8 @@ typedef struct
 {
   MultisineConfig config;
   float fundamental_hz; // 量化后的实际基频，分析时使用此值
+  float phase_step;     // 每采样点基频相位增量 (2*pi/period_ticks)
+  float shift[MULTISINE_MAX_TONES]; // 预计算的 Schroeder 相位偏置
   float reference;
   uint32_t period_ticks;
   uint32_t tick;

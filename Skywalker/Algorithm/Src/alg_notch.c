@@ -16,7 +16,7 @@ void NotchFilterInit(NotchFilterObject *notch_filter, float f0, float q,
   {
     return;
   }
-  if (fs <= 0.0f || q <= 0.0f || f0 <= 0.0f || f0 >= fs * 0.5f)
+  if (!(fs > 0.0f && q > 0.0f && f0 > 0.0f && f0 < fs * 0.5f))
   {
     notch_filter->a0 = 1.0f;
     notch_filter->a1 = 0.0f;
@@ -29,7 +29,7 @@ void NotchFilterInit(NotchFilterObject *notch_filter, float f0, float q,
     notch_filter->y2 = 0.0f;
     return;
   }
-  float w0 = 2.0f * (float)M_PI * f0 / fs;
+  float w0 = 2.0f * 3.14159265358979323846f * f0 / fs;
   float alpha = sinf(w0) / (2.0f * q);
   float cos_w0 = cosf(w0);
   float a0 = 1.0f + alpha;
@@ -51,9 +51,9 @@ void NotchFilterInit(NotchFilterObject *notch_filter, float f0, float q,
  */
 float NotchFilterProcess(NotchFilterObject *notch_filter, float input)
 {
-  if (notch_filter == NULL)
+  if (notch_filter == NULL || !isfinite(input))
   {
-    return input;
+    return (notch_filter != NULL) ? notch_filter->y1 : input;
   }
   // 计算当前输出
   float output =

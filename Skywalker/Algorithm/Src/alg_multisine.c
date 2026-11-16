@@ -52,6 +52,12 @@ bool MultisineInit(MultisineObject *multisine, const MultisineConfig *config)
   multisine->period_ticks = (uint32_t)ticks;
   multisine->fundamental_hz =
       1.0f / (multisine->period_ticks * config->sampling_time);
+  multisine->phase_step = 6.2831853f / (float)multisine->period_ticks;
+  for (uint8_t i = 0U; i < config->tone_count; i++)
+  {
+    multisine->shift[i] =
+        -3.1415927f * (float)i * (float)(i + 1U) / (float)config->tone_count;
+  }
   multisine->reference = config->offset;
   multisine->initialized = true;
   return true;
@@ -101,12 +107,11 @@ float MultisineCalculate(MultisineObject *multisine)
     return c->offset;
   }
   multisine->measuring = multisine->period >= c->settling_periods;
-  float phase = 6.2831853f * (float)multisine->sample / multisine->period_ticks;
+  float phase = multisine->phase_step * (float)multisine->sample;
   float value = 0.0f;
   for (uint8_t i = 0U; i < c->tone_count; i++)
   {
-    float shift = -3.1415927f * (float)i * (float)(i + 1U) / c->tone_count;
-    value += sinf(c->harmonic[i] * phase + shift);
+    value += sinf((float)c->harmonic[i] * phase + multisine->shift[i]);
   }
   float envelope =
       multisine->period == 0U ? 0.5f - 0.5f * cosf(0.5f * phase) : 1.0f;

@@ -4,8 +4,8 @@
 #include "stdbool.h"
 #include "stdint.h"
 // CRC8校验表
-uint8_t crc8_init = 0xFF;
-uint8_t crc8_table[256] = {
+const uint8_t crc8_init = 0xFF;
+const uint8_t crc8_table[256] = {
     0x00, 0x5E, 0xBC, 0xE2, 0x61, 0x3F, 0xDD, 0x83, 0xC2, 0x9C, 0x7E, 0x20,
     0xA3, 0xFD, 0x1F, 0x41, 0x9D, 0xC3, 0x21, 0x7F, 0xFC, 0xA2, 0x40, 0x1E,
     0x5F, 0x01, 0xE3, 0xBD, 0x3E, 0x60, 0x82, 0xDC, 0x23, 0x7D, 0x9F, 0xC1,
@@ -29,8 +29,8 @@ uint8_t crc8_table[256] = {
     0x74, 0x2A, 0xC8, 0x96, 0x15, 0x4B, 0xA9, 0xF7, 0xB6, 0xE8, 0x0A, 0x54,
     0xD7, 0x89, 0x6B, 0x35};
 // CRC16校验表
-uint16_t crc16_init = 0xFFFF;
-uint16_t crc16_table[256] = {
+const uint16_t crc16_init = 0xFFFF;
+const uint16_t crc16_table[256] = {
     0x0000, 0x1189, 0x2312, 0x329B, 0x4624, 0x57AD, 0x6536, 0x74BF, 0x8C48,
     0x9DC1, 0xAF5A, 0xBED3, 0xCA6C, 0xDBE5, 0xE97E, 0xF8F7, 0x1081, 0x0108,
     0x3393, 0x221A, 0x56A5, 0x472C, 0x75B7, 0x643E, 0x9CC9, 0x8D40, 0xBFDB,
@@ -66,9 +66,13 @@ uint16_t crc16_table[256] = {
  * @param len 数据长度（字节）
  * @return CRC8校验值
  */
-uint8_t GetCrc8(uint8_t *data, uint16_t len)
+uint8_t GetCrc8(const uint8_t *data, uint16_t len)
 {
   uint8_t crc8 = crc8_init;
+  if (data == NULL)
+  {
+    return crc8;
+  }
   uint8_t byte;
   uint8_t i;
   while (len--)
@@ -85,9 +89,13 @@ uint8_t GetCrc8(uint8_t *data, uint16_t len)
  * @param len 数据长度（字节）
  * @return CRC16校验值
  */
-uint16_t GetCrc16(uint8_t *data, uint16_t len)
+uint16_t GetCrc16(const uint8_t *data, uint16_t len)
 {
   uint16_t crc16 = crc16_init;
+  if (data == NULL)
+  {
+    return crc16;
+  }
   uint8_t byte;
   uint8_t i;
   while (len--)
@@ -105,13 +113,13 @@ uint16_t GetCrc16(uint8_t *data, uint16_t len)
  * @return
  * true表示校验通过，false表示校验失败
  */
-bool CheckCrc8(uint8_t *data, uint16_t len)
+bool CheckCrc8(const uint8_t *data, uint16_t len)
 {
   if (data == NULL || len < 2U)
   {
     return false;
   }
-  return GetCrc8(data, len - 1) == data[len - 1];
+  return GetCrc8(data, (uint16_t)(len - 1U)) == data[len - 1U];
 }
 /**
  * @brief 检查CRC16校验值
@@ -120,11 +128,13 @@ bool CheckCrc8(uint8_t *data, uint16_t len)
  * @return
  * true表示校验通过，false表示校验失败
  */
-bool CheckCrc16(uint8_t *data, uint16_t len)
+bool CheckCrc16(const uint8_t *data, uint16_t len)
 {
-  if (data == NULL || len < 2U)
+  if (data == NULL || len < 3U)
   {
     return false;
   }
-  return GetCrc16(data, len - 2) == ((data[len - 1] << 8) | data[len - 2]);
+  uint16_t expected =
+      (uint16_t)(((uint16_t)data[len - 1U] << 8) | (uint16_t)data[len - 2U]);
+  return GetCrc16(data, (uint16_t)(len - 2U)) == expected;
 }

@@ -17,6 +17,16 @@
 float MotionRampUpdate(MotionRamp *ramp, float target, float rise_rate,
                        float fall_rate, float sampling_time)
 {
+  if (ramp == NULL)
+  {
+    return target;
+  }
+  if (!isfinite(target) || !isfinite(rise_rate) || !isfinite(fall_rate) ||
+      !isfinite(sampling_time) || sampling_time <= 0.0f || rise_rate < 0.0f ||
+      fall_rate < 0.0f)
+  {
+    return ramp->value;
+  }
   float delta = target - ramp->value;
   delta = MathClamp(delta, -fall_rate * sampling_time, rise_rate * sampling_time);
   ramp->value += delta;
@@ -32,11 +42,17 @@ float MotionRampUpdate(MotionRamp *ramp, float target, float rise_rate,
 void MotionTrajectoryReset(MotionTrajectory *trajectory, float position,
                            float duration)
 {
+  if (trajectory == NULL)
+  {
+    return;
+  }
   memset(trajectory, 0, sizeof(*trajectory));
-  trajectory->position = position;
-  trajectory->target = position;
-  trajectory->duration = duration;
-  trajectory->coefficient[0] = position;
+  float safe_pos = isfinite(position) ? position : 0.0f;
+  float safe_dur = (isfinite(duration) && duration > 0.0f) ? duration : 0.0f;
+  trajectory->position = safe_pos;
+  trajectory->target = safe_pos;
+  trajectory->duration = safe_dur;
+  trajectory->coefficient[0] = safe_pos;
 }
 
 /**
@@ -48,8 +64,21 @@ void MotionTrajectoryReset(MotionTrajectory *trajectory, float position,
 void MotionTrajectoryUpdate(MotionTrajectory *trajectory, float target,
                             float sampling_time)
 {
+  if (trajectory == NULL || !isfinite(target) || !isfinite(sampling_time) ||
+      sampling_time <= 0.0f)
+  {
+    return;
+  }
   float *c = trajectory->coefficient;
   float duration = trajectory->duration;
+  if (!isfinite(duration) || duration <= 0.0f)
+  {
+    trajectory->position = target;
+    trajectory->target = target;
+    trajectory->velocity = 0.0f;
+    trajectory->acceleration = 0.0f;
+    return;
+  }
   if (target != trajectory->target)
   {
     float delta = target - trajectory->position;
@@ -163,6 +192,13 @@ void SteerSetpointUpdate(SteerSetpoint *setpoint, Chassis *chassis,
                          float wheel_acceleration, float steer_rate,
                          float switch_hysteresis, float sampling_time)
 {
+  if (setpoint == NULL || chassis == NULL || !isfinite(wheel_acceleration) ||
+      !isfinite(steer_rate) || !isfinite(switch_hysteresis) ||
+      !isfinite(sampling_time) || sampling_time <= 0.0f ||
+      wheel_acceleration < 0.0f || steer_rate < 0.0f)
+  {
+    return;
+  }
   if (!setpoint->has_sample)
   {
     SteerSetpointReset(setpoint, chassis->wheel_angle_feedback);
@@ -260,6 +296,10 @@ void SteerSpeedCorrect(const ChassisState *target, const float angle[4],
 float MotorPowerEstimate(const MotorPowerModel *model, const float *current,
                          const float *omega, unsigned int count, float scale)
 {
+  if (model == NULL || current == NULL || omega == NULL || !isfinite(scale))
+  {
+    return 0.0f;
+  }
   float power = 0.0f;
   for (unsigned int i = 0; i < count; i++)
   {
@@ -283,6 +323,11 @@ float MotorPowerEstimate(const MotorPowerModel *model, const float *current,
 float MotorPowerScale(const MotorPowerModel *model, const float *current,
                       const float *omega, unsigned int count, float budget)
 {
+  if (model == NULL || current == NULL || omega == NULL || !isfinite(budget) ||
+      budget <= 0.0f)
+  {
+    return 0.0f;
+  }
   if (MotorPowerEstimate(model, current, omega, count, 1.0f) <= budget)
   {
     return 1.0f;
@@ -321,7 +366,10 @@ bool ChassisEstimateVelocity(const Chassis *chassis, const float speed[4],
                              float *residual)
 {
   if (chassis == NULL || speed == NULL || velocity == NULL ||
-      residual == NULL || (chassis->type == kSteerWheel && angle == NULL))
+      residual == NULL || (chassis->type == kSteerWheel && angle == NULL) ||
+      !isfinite(gyro_omega) || !isfinite(gyro_weight) || gyro_weight < 0.0f ||
+      (chassis->type != kSteerWheel && chassis->type != kMecanumWheel &&
+       chassis->type != kOmniWheel))
   {
     return false;
   }
@@ -387,8 +435,8 @@ bool ChassisEstimateVelocity(const Chassis *chassis, const float speed[4],
       }
     }
 
-    // 奇异性检查：最大主元过小说明方程病态或不可解（如舵轮打滑或几何退化）
-    if (max_val < 1e-6f)
+    // 奇异性检查：最大主元过小或 NaN 说明方程病态或不可解（如舵轮打滑或几何退化）
+    if (!(max_val >= 1e-6f))
     {
       return false;
     }

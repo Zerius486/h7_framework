@@ -405,7 +405,7 @@ bool SysidUpdate(SysidObject *sysid, float current, float omega)
   float decay = config->memory_time > 0.0f
                     ? expf(-sysid->elapsed / config->memory_time)
                     : 1.0f;
-  decay = fmaxf(decay, 0.98f);
+  decay = fmaxf(decay, 0.5f);
   float denominator = decay;
   for (int i = 0; i < 4; i++)
   {

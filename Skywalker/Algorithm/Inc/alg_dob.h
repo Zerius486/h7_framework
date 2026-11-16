@@ -20,6 +20,7 @@ typedef struct
 {
   DobConfig config;            // 扰动观测器配置
   float J_equivalent;           // 转子侧等效惯量（kg·m²）
+  float inv_torque_constant;    // 转矩常数倒数（A/N·m）
   float filter_decay;           // 低通滤波衰减系数
   float filter_derivative_gain; // 离散带限微分增益
   float filtered_current;       // 滤波后的转矩电流（A）

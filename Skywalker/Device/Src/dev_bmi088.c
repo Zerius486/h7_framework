@@ -82,7 +82,8 @@ typedef struct
   Bmi088Status error; // 配置失败时返回的错误码
 } Bmi088RegisterConfig;
 
-Bmi088Object g_bmi088 = {0};
+// 放置于 0 等待周期的 DTCMRAM，加速 1 kHz IMU 与 EKF 矩阵运算
+Bmi088Object g_bmi088 __attribute__((section(".dtcmram"))) = {0};
 
 static const Bmi088RegisterConfig kBmi088AccelConfig[kBmi088AccelConfigCount] =
     {

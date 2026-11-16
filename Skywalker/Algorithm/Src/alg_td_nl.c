@@ -10,10 +10,14 @@
  */
 void TdNlInit(TdNlObject *td_nl, float r, float h)
 {
+  if (td_nl == NULL)
+  {
+    return;
+  }
   td_nl->x1 = 0.0f;
   td_nl->x2 = 0.0f;
-  td_nl->r = r;
-  td_nl->h = h;
+  td_nl->r = (isfinite(r) && r > 0.0f) ? r : 0.0f;
+  td_nl->h = (isfinite(h) && h > 0.0f) ? h : 0.0f;
 }
 /**
  * @brief 浮点符号函数
@@ -62,11 +66,14 @@ static float Fhan(float x_1, float x_2, float r, float h)
  */
 void TdNlUpdate(TdNlObject *td_nl, float input, float dt)
 {
-  if (td_nl == NULL || dt <= 0.0f || td_nl->r <= 0.0f || td_nl->h <= 0.0f)
+  if (td_nl == NULL || !isfinite(input) || !isfinite(dt) || dt <= 0.0f ||
+      !isfinite(td_nl->r) || td_nl->r <= 0.0f || !isfinite(td_nl->h) ||
+      td_nl->h <= 0.0f)
   {
     return;
   }
-  float fh = Fhan(td_nl->x1 - input, td_nl->x2, td_nl->r, td_nl->h);
+  float h = td_nl->h < dt ? dt : td_nl->h;
+  float fh = Fhan(td_nl->x1 - input, td_nl->x2, td_nl->r, h);
   float x1_dot = td_nl->x2;
   float x2_dot = fh;
   td_nl->x1 += x1_dot * dt;

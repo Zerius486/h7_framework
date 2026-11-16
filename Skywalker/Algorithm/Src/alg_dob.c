@@ -36,6 +36,7 @@ bool DobInit(DobObject *dob, const DobConfig *config)
   memset(dob, 0, sizeof(*dob));
   dob->config = *config;
   dob->J_equivalent = equivalent_inertia;
+  dob->inv_torque_constant = 1.0f / config->torque_constant;
   dob->filter_decay = expf(-2.0f * 3.14159265358979323846f *
                            config->filter_cutoff_hz * config->sampling_time);
   dob->filter_derivative_gain =
@@ -97,7 +98,7 @@ float DobUpdate(DobObject *dob, float actual_torque_current, float rotor_omega)
       dob->config.torque_constant * dob->filtered_current -
       dob->J_equivalent * filtered_acceleration;
 
-  float compensation = dob->estimated_disturbance / dob->config.torque_constant;
+  float compensation = dob->estimated_disturbance * dob->inv_torque_constant;
   if (compensation > dob->config.max_compensation)
   {
     compensation = dob->config.max_compensation;

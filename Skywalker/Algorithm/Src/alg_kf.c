@@ -1,7 +1,22 @@
 #include "alg_kf.h"
 
+#include <math.h>
+#include <stdbool.h>
+#include <string.h>
+
 #include "arm_math.h"
-#include "string.h"
+
+static bool KfVectorFinite(const float *vec, uint8_t size)
+{
+  for (uint8_t i = 0U; i < size; ++i)
+  {
+    if (!isfinite(vec[i]))
+    {
+      return false;
+    }
+  }
+  return true;
+}
 /**
  * @brief 获取卡尔曼滤波器工作区大小
  * @param xhat_size 状态向量大小
@@ -292,6 +307,19 @@ arm_status KfUpdate(KfObject *kf, const float *z_measurement)
     return status;
   }
   status = arm_mat_mult_f32(&kf->temp_xx_2, &kf->p_minus, &kf->p);
+  if (status == ARM_MATH_SUCCESS)
+  {
+    uint16_t n = kf->xhat_size;
+    for (uint16_t r = 0U; r < n; ++r)
+    {
+      for (uint16_t c = r + 1U; c < n; ++c)
+      {
+        float sym = 0.5f * (kf->p_data[r * n + c] + kf->p_data[c * n + r]);
+        kf->p_data[r * n + c] = sym;
+        kf->p_data[c * n + r] = sym;
+      }
+    }
+  }
   return status;
 }
 /**
@@ -311,7 +339,15 @@ arm_status KfStep(KfObject *kf, const float *u, const float *z_measurement)
   }
   if ((u != NULL) && (kf->u_size > 0U))
   {
+    if (!KfVectorFinite(u, kf->u_size))
+    {
+      return ARM_MATH_ARGUMENT_ERROR;
+    }
     KfCopyVector(kf->u_data, u, kf->u_size);
+  }
+  if ((z_measurement != NULL) && !KfVectorFinite(z_measurement, kf->z_size))
+  {
+    return ARM_MATH_ARGUMENT_ERROR;
   }
   status = KfPredict(kf);
   if (status != ARM_MATH_SUCCESS)
