@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "alg_imu_ekf.h"
+#include "alg_motion.h"
 #include "alg_pid.h"
 #include "dev_peripheral.h"
 #include "stm32h7xx_hal.h"
@@ -91,6 +92,8 @@ typedef struct
   uint32_t init_euler_sample_delay_ms;   // 初始姿态采样间隔（ms）
   const float *install_matrix;           // 传感器到机体系安装矩阵
   float motion_accel_lpf;                // 运动加速度低通时间常数（s）
+  float lever_arm[3];                    // 机体系下IMU指向质心的杆臂向量（m）
+  float lever_arm_diff_lpf;              // 杆臂/角速度微分一阶低通时间常数（s）
 } Bmi088ImuConfig;
 
 typedef struct
@@ -117,10 +120,12 @@ typedef struct
   float gyro_bias[3];              // EKF估计陀螺零偏（rad/s）
   float corrected_accel[3];        // 安装误差修正后的加速度（m/s^2）
   float corrected_gyro[3];         // 安装误差修正后的角速度（rad/s）
+  float com_accel[3];              // 杆臂补偿后的质心加速度（机体系，m/s^2）
   float motion_accel_body[3];      // 机体系运动加速度（m/s^2）
   float motion_accel_earth[3];     // 地面系运动加速度（m/s^2）
   float install_matrix[9];         // 传感器到机体系安装修正矩阵
   float motion_accel_lpf;          // 运动加速度低通时间常数（s）
+  LeverArmCompensator lever_arm;   // 刚体杆臂效应补偿器
   uint32_t update_count;           // IMU更新计数
   arm_status imu_ekf_status;       // 最近一次EKF更新状态
   bool is_imu_enabled;             // IMU EKF使能标志
@@ -150,6 +155,9 @@ void Bmi088ImuSetEkfQr(Bmi088Object *bmi088,
 void Bmi088ImuSetInstallMatrix(Bmi088Object *bmi088,
                                const float install_matrix[9]);
 void Bmi088ImuSetMotionAccelLpf(Bmi088Object *bmi088, float lpf);
+void Bmi088ImuSetLeverArm(Bmi088Object *bmi088, const float lever_arm[3],
+                           float diff_lpf_tau);
+void Bmi088ImuUpdateLeverArm(Bmi088Object *bmi088, const float lever_arm[3]);
 Bmi088Status Bmi088ImuCalibrate(Bmi088Object *bmi088, uint16_t sample_count,
                                 uint32_t sample_delay_ms,
                                 float g_norm_motion_threshold,

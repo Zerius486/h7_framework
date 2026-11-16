@@ -614,9 +614,13 @@ static void Bmi088UpdateMotionAccel(Bmi088Object *bmi088)
         bmi088->imu_ekf.dt / (bmi088->motion_accel_lpf + bmi088->imu_ekf.dt);
   }
 
+  LeverArmCompensatorUpdate(&bmi088->lever_arm, bmi088->corrected_accel,
+                            bmi088->imu_ekf.corrected_gyro_data,
+                            bmi088->imu_ekf.dt, bmi088->com_accel);
+
   for (uint8_t i = 0; i < 3U; i++)
   {
-    motion_body_raw[i] = bmi088->corrected_accel[i] - gravity_body[i];
+    motion_body_raw[i] = bmi088->com_accel[i] - gravity_body[i];
     bmi088->motion_accel_body[i] =
         alpha * motion_body_raw[i] +
         (1.0f - alpha) * bmi088->motion_accel_body[i];
@@ -775,6 +779,8 @@ Bmi088Status Bmi088ImuInit(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi,
   bmi088->motion_accel_lpf = (config->motion_accel_lpf > 0.0f)
                                  ? config->motion_accel_lpf
                                  : kBmi088DefaultMotionAccelLpf;
+  LeverArmCompensatorInit(&bmi088->lever_arm, config->lever_arm,
+                          config->lever_arm_diff_lpf);
 
   if (config->is_auto_calibrate_enabled)
   {
@@ -888,8 +894,10 @@ void Bmi088ImuReset(Bmi088Object *bmi088)
   memset(&bmi088->euler, 0, sizeof(bmi088->euler));
   memset(&bmi088->euler_rate, 0, sizeof(bmi088->euler_rate));
   memset(bmi088->gyro_bias, 0, sizeof(bmi088->gyro_bias));
+  memset(bmi088->com_accel, 0, sizeof(bmi088->com_accel));
   memset(bmi088->motion_accel_body, 0, sizeof(bmi088->motion_accel_body));
   memset(bmi088->motion_accel_earth, 0, sizeof(bmi088->motion_accel_earth));
+  LeverArmCompensatorReset(&bmi088->lever_arm);
   bmi088->update_count = 0U;
   bmi088->is_data_ready = false;
   bmi088->imu_ekf_status = ARM_MATH_SUCCESS;
@@ -952,6 +960,36 @@ void Bmi088ImuSetMotionAccelLpf(Bmi088Object *bmi088, float lpf)
     return;
   }
   bmi088->motion_accel_lpf = lpf;
+}
+
+/**
+ * @brief 配置并启用IMU刚体杆臂效应补偿
+ * @param bmi088 BMI088对象指针
+ * @param lever_arm 机体系下由IMU指向质心的杆臂向量（m），传NULL或全零禁用
+ * @param diff_lpf_tau 微分一阶低通时间常数（s）
+ */
+void Bmi088ImuSetLeverArm(Bmi088Object *bmi088, const float lever_arm[3],
+                           float diff_lpf_tau)
+{
+  if (bmi088 == NULL)
+  {
+    return;
+  }
+  LeverArmCompensatorInit(&bmi088->lever_arm, lever_arm, diff_lpf_tau);
+}
+
+/**
+ * @brief 动态更新杆臂向量（如云台旋转导致的底盘质心相对位移）
+ * @param bmi088 BMI088对象指针
+ * @param lever_arm 机体系下由IMU指向质心的杆臂向量（m）
+ */
+void Bmi088ImuUpdateLeverArm(Bmi088Object *bmi088, const float lever_arm[3])
+{
+  if (bmi088 == NULL)
+  {
+    return;
+  }
+  LeverArmCompensatorSetArm(&bmi088->lever_arm, lever_arm);
 }
 
 /**

@@ -488,3 +488,297 @@ bool ChassisEstimateVelocity(const Chassis *chassis, const float speed[4],
   *residual = sqrtf(error / (float)count);
   return true;
 }
+
+static void VectorCross3(const float a[3], const float b[3], float out[3])
+{
+  out[0] = a[1] * b[2] - a[2] * b[1];
+  out[1] = a[2] * b[0] - a[0] * b[2];
+  out[2] = a[0] * b[1] - a[1] * b[0];
+}
+
+static bool VectorFinite3(const float v[3])
+{
+  return isfinite(v[0]) && isfinite(v[1]) && isfinite(v[2]);
+}
+
+/**
+ * @brief 初始化IMU刚体杆臂效应补偿器
+ * @param comp 补偿器指针
+ * @param lever_arm 机体系下从IMU指向质心的杆臂向量（m），NULL或全零时禁用
+ * @param diff_lpf_tau 角加速度与杆臂微分的一阶低通时间常数（s）
+ */
+void LeverArmCompensatorInit(LeverArmCompensator *comp,
+                             const float lever_arm[3], float diff_lpf_tau)
+{
+  if (comp == NULL)
+  {
+    return;
+  }
+  memset(comp, 0, sizeof(*comp));
+  comp->diff_lpf_tau =
+      (isfinite(diff_lpf_tau) && diff_lpf_tau > 0.0f) ? diff_lpf_tau : 0.0f;
+  if (lever_arm != NULL)
+  {
+    LeverArmCompensatorSetArm(comp, lever_arm);
+  }
+}
+
+/**
+ * @brief 重置杆臂补偿器历史微分状态
+ * @param comp 补偿器指针
+ */
+void LeverArmCompensatorReset(LeverArmCompensator *comp)
+{
+  if (comp == NULL)
+  {
+    return;
+  }
+  memset(comp->prev_lever_arm, 0, sizeof(comp->prev_lever_arm));
+  memset(comp->lever_arm_vel, 0, sizeof(comp->lever_arm_vel));
+  memset(comp->prev_lever_arm_vel, 0, sizeof(comp->prev_lever_arm_vel));
+  memset(comp->lever_arm_acc, 0, sizeof(comp->lever_arm_acc));
+  memset(comp->prev_omega, 0, sizeof(comp->prev_omega));
+  memset(comp->alpha, 0, sizeof(comp->alpha));
+  comp->has_sample = false;
+}
+
+/**
+ * @brief 更新机体系下的杆臂向量（支持云台旋转等动态杆臂场景）
+ * @param comp 补偿器指针
+ * @param lever_arm 机体系下从IMU指向质心的杆臂向量（m）
+ */
+void LeverArmCompensatorSetArm(LeverArmCompensator *comp,
+                               const float lever_arm[3])
+{
+  if (comp == NULL || lever_arm == NULL || !VectorFinite3(lever_arm))
+  {
+    return;
+  }
+  comp->lever_arm[0] = lever_arm[0];
+  comp->lever_arm[1] = lever_arm[1];
+  comp->lever_arm[2] = lever_arm[2];
+  comp->enabled = (fabsf(lever_arm[0]) > 1e-6f) ||
+                  (fabsf(lever_arm[1]) > 1e-6f) ||
+                  (fabsf(lever_arm[2]) > 1e-6f);
+  if (!comp->enabled)
+  {
+    LeverArmCompensatorReset(comp);
+  }
+}
+
+/**
+ * @brief 计算杆臂效应补偿后的质心加速度:
+ *        a_com = a_imu + alpha x d + omega x (omega x d) + 2*omega x d_dot + d_ddot
+ * @param comp 补偿器指针
+ * @param accel_imu IMU安装处加速度（m/s²）
+ * @param omega 机体角速度（rad/s）
+ * @param dt 采样时间（s）
+ * @param accel_com 输出质心加速度（m/s²）
+ */
+void LeverArmCompensatorUpdate(LeverArmCompensator *comp,
+                                 const float accel_imu[3], const float omega[3],
+                                 float dt, float accel_com[3])
+{
+  if (accel_imu == NULL || accel_com == NULL)
+  {
+    return;
+  }
+  if (comp == NULL || !comp->enabled || omega == NULL || !isfinite(dt) ||
+      dt <= 0.0f || !VectorFinite3(accel_imu) || !VectorFinite3(omega))
+  {
+    accel_com[0] = accel_imu[0];
+    accel_com[1] = accel_imu[1];
+    accel_com[2] = accel_imu[2];
+    return;
+  }
+
+  if (!comp->has_sample)
+  {
+    for (int i = 0; i < 3; i++)
+    {
+      comp->prev_omega[i] = omega[i];
+      comp->prev_lever_arm[i] = comp->lever_arm[i];
+      comp->lever_arm_vel[i] = 0.0f;
+      comp->prev_lever_arm_vel[i] = 0.0f;
+      comp->lever_arm_acc[i] = 0.0f;
+      comp->alpha[i] = 0.0f;
+    }
+    comp->has_sample = true;
+  }
+  else
+  {
+    float inv_dt = 1.0f / dt;
+    float lpf_alpha =
+        (comp->diff_lpf_tau > 0.0f) ? (dt / (comp->diff_lpf_tau + dt)) : 1.0f;
+    for (int i = 0; i < 3; i++)
+    {
+      float raw_alpha = (omega[i] - comp->prev_omega[i]) * inv_dt;
+      comp->alpha[i] += lpf_alpha * (raw_alpha - comp->alpha[i]);
+      comp->prev_omega[i] = omega[i];
+
+      float raw_vel = (comp->lever_arm[i] - comp->prev_lever_arm[i]) * inv_dt;
+      comp->lever_arm_vel[i] += lpf_alpha * (raw_vel - comp->lever_arm_vel[i]);
+      comp->prev_lever_arm[i] = comp->lever_arm[i];
+
+      float raw_acc =
+          (comp->lever_arm_vel[i] - comp->prev_lever_arm_vel[i]) * inv_dt;
+      comp->lever_arm_acc[i] += lpf_alpha * (raw_acc - comp->lever_arm_acc[i]);
+      comp->prev_lever_arm_vel[i] = comp->lever_arm_vel[i];
+    }
+  }
+
+  float tangential[3];
+  float omega_cross_d[3];
+  float centripetal[3];
+  float coriolis[3];
+  VectorCross3(comp->alpha, comp->lever_arm, tangential);
+  VectorCross3(omega, comp->lever_arm, omega_cross_d);
+  VectorCross3(omega, omega_cross_d, centripetal);
+  VectorCross3(omega, comp->lever_arm_vel, coriolis);
+
+  for (int i = 0; i < 3; i++)
+  {
+    accel_com[i] = accel_imu[i] + tangential[i] + centripetal[i] +
+                   2.0f * coriolis[i] + comp->lever_arm_acc[i];
+  }
+}
+
+/**
+ * @brief 使用默认参数初始化3状态速度卡尔曼滤波器配置
+ * @param config 配置结构体指针
+ * @param sampling_time 采样时间（s）
+ */
+void ChassisSpeedKfConfigInit(ChassisSpeedKfConfig *config, float sampling_time)
+{
+  if (config == NULL)
+  {
+    return;
+  }
+  config->sampling_time = sampling_time;
+  config->accel_q = 3000.0f;
+  config->bias_q = 0.1f;
+  config->vel_r = 10.0f;
+  config->acc_r = 3.0f;
+}
+
+static void ChassisSpeedKfApplyMatrices(ChassisSpeedKf *speed_kf)
+{
+  float dt = speed_kf->config.sampling_time;
+  float dt2 = dt * dt;
+  float dt3 = dt2 * dt;
+  float dt4 = dt2 * dt2;
+  float q = speed_kf->config.accel_q;
+  float qb = speed_kf->config.bias_q;
+
+  memset(speed_kf->kf.f_data, 0, 9U * sizeof(float));
+  speed_kf->kf.f_data[0] = 1.0f;
+  speed_kf->kf.f_data[1] = dt;
+  speed_kf->kf.f_data[4] = 1.0f;
+  speed_kf->kf.f_data[8] = 1.0f;
+
+  memset(speed_kf->kf.q_data, 0, 9U * sizeof(float));
+  speed_kf->kf.q_data[0] = 0.25f * dt4 * q;
+  speed_kf->kf.q_data[1] = 0.5f * dt3 * q;
+  speed_kf->kf.q_data[3] = 0.5f * dt3 * q;
+  speed_kf->kf.q_data[4] = dt2 * q;
+  speed_kf->kf.q_data[8] = dt * qb;
+
+  memset(speed_kf->kf.h_data, 0, 6U * sizeof(float));
+  speed_kf->kf.h_data[0] = 1.0f;
+  speed_kf->kf.h_data[4] = 1.0f;
+  speed_kf->kf.h_data[5] = 1.0f;
+
+  memset(speed_kf->kf.r_data, 0, 4U * sizeof(float));
+  speed_kf->kf.r_data[0] = speed_kf->config.vel_r;
+  speed_kf->kf.r_data[3] = speed_kf->config.acc_r;
+}
+
+/**
+ * @brief 初始化3状态底盘速度卡尔曼滤波器
+ * @param speed_kf 滤波器对象指针
+ * @param config 配置结构体指针
+ * @return true表示初始化成功
+ */
+bool ChassisSpeedKfInit(ChassisSpeedKf *speed_kf,
+                        const ChassisSpeedKfConfig *config)
+{
+  if (speed_kf == NULL || config == NULL || !isfinite(config->sampling_time) ||
+      config->sampling_time <= 0.0f || !isfinite(config->accel_q) ||
+      config->accel_q <= 0.0f || !isfinite(config->bias_q) ||
+      config->bias_q < 0.0f || !isfinite(config->vel_r) ||
+      config->vel_r <= 0.0f || !isfinite(config->acc_r) ||
+      config->acc_r <= 0.0f)
+  {
+    return false;
+  }
+  if (KfWorkspaceSize(3U, 0U, 2U) > CHASSIS_SPEED_KF_WORKSPACE_SIZE)
+  {
+    return false;
+  }
+
+  memset(speed_kf, 0, sizeof(*speed_kf));
+  speed_kf->config = *config;
+  if (KfInit(&speed_kf->kf, 3U, 0U, 2U, speed_kf->workspace,
+             CHASSIS_SPEED_KF_WORKSPACE_SIZE) != 0)
+  {
+    return false;
+  }
+  ChassisSpeedKfApplyMatrices(speed_kf);
+  speed_kf->initialized = true;
+  ChassisSpeedKfReset(speed_kf);
+  return true;
+}
+
+/**
+ * @brief 复位底盘速度卡尔曼滤波器状态与协方差
+ * @param speed_kf 滤波器对象指针
+ */
+void ChassisSpeedKfReset(ChassisSpeedKf *speed_kf)
+{
+  if (speed_kf == NULL || !speed_kf->initialized)
+  {
+    return;
+  }
+  memset(speed_kf->kf.xhat_data, 0, 3U * sizeof(float));
+  memset(speed_kf->kf.xhat_minus_data, 0, 3U * sizeof(float));
+  memset(speed_kf->kf.p_data, 0, 9U * sizeof(float));
+  speed_kf->kf.p_data[0] = 1.0f;
+  speed_kf->kf.p_data[4] = 1.0f;
+  speed_kf->kf.p_data[8] = 1.0f;
+  speed_kf->velocity = 0.0f;
+  speed_kf->acceleration = 0.0f;
+  speed_kf->accel_bias = 0.0f;
+  speed_kf->position = 0.0f;
+}
+
+/**
+ * @brief 单步更新底盘速度卡尔曼滤波器（腾空/打滑时构造零残差伪观测）
+ * @param speed_kf 滤波器对象指针
+ * @param wheel_velocity 轮速计估计的前向速度（m/s）
+ * @param accel_imu 经过杆臂补偿及重力扣除后的IMU前向加速度（m/s²）
+ * @param wheel_valid 轮速观测是否可信（触地未打滑为true，腾空/打滑为false）
+ * @return 融合估计的底盘前向速度（m/s）
+ */
+float ChassisSpeedKfUpdate(ChassisSpeedKf *speed_kf, float wheel_velocity,
+                           float accel_imu, bool wheel_valid)
+{
+  if (speed_kf == NULL || !speed_kf->initialized || !isfinite(accel_imu) ||
+      (wheel_valid && !isfinite(wheel_velocity)))
+  {
+    return (speed_kf != NULL) ? speed_kf->velocity : 0.0f;
+  }
+
+  float z_vel = wheel_valid
+                    ? wheel_velocity
+                    : (speed_kf->velocity +
+                       speed_kf->acceleration * speed_kf->config.sampling_time);
+  float z[2] = {z_vel, accel_imu};
+  if (KfStep(&speed_kf->kf, NULL, z) == ARM_MATH_SUCCESS)
+  {
+    speed_kf->velocity = speed_kf->kf.xhat_data[0];
+    speed_kf->acceleration = speed_kf->kf.xhat_data[1];
+    speed_kf->accel_bias = speed_kf->kf.xhat_data[2];
+    speed_kf->position += speed_kf->velocity * speed_kf->config.sampling_time;
+  }
+  return speed_kf->velocity;
+}
