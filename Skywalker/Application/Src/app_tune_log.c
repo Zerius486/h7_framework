@@ -147,6 +147,17 @@ void AppTuneLogProcess(void)
 }
 
 /**
+ * @brief 在空闲管理循环中继续刷出已结束整定的残留日志，避免 recording 卡死
+ */
+void AppTuneLogFlushIdle(void)
+{
+  if (g_app_tune_log_mode == kAppTuneLogNone && g_app_tune_log.stopping)
+  {
+    DebugLogProcess(&g_app_tune_log);
+  }
+}
+
+/**
  * @brief 开始自动记录一次整定运行
  * @param mode 整定类型
  * @param time_ms 当前时间（ms）
@@ -240,6 +251,13 @@ void AppTuneLogAutotune(const AutotuneObject *tune, uint32_t time_ms,
   }
   if (!active)
   {
+    AppTuneLogWrite(time_ms, (uint8_t)tune->state, (uint8_t)tune->error,
+                    tune->speed_pid.reference, position, omega, actual_current,
+                    requested_current, executed_current,
+                    fabsf(executed_current - requested_current) > 0.001f ||
+                        fabsf(requested_current) >=
+                            0.999f * tune->config.current_limit,
+                    &tune->result.model);
     char message[DEBUG_LOG_MAX_PAYLOAD];
     if (tune->state == kAutotuneComplete)
     {
@@ -263,13 +281,6 @@ void AppTuneLogAutotune(const AutotuneObject *tune, uint32_t time_ms,
         DebugLogError(&g_app_tune_log, time_ms, message);
       }
     }
-    AppTuneLogWrite(time_ms, (uint8_t)tune->state, (uint8_t)tune->error,
-                    tune->speed_pid.reference, position, omega, actual_current,
-                    requested_current, executed_current,
-                    fabsf(executed_current - requested_current) > 0.001f ||
-                        fabsf(requested_current) >=
-                            0.999f * tune->config.current_limit,
-                    &tune->result.model);
     DebugLogStop(&g_app_tune_log, time_ms);
     g_app_tune_log_mode = kAppTuneLogNone;
     return;
@@ -277,6 +288,12 @@ void AppTuneLogAutotune(const AutotuneObject *tune, uint32_t time_ms,
   uint8_t phase = tune->state == kAutotuneIdentify
                       ? (uint8_t)tune->identification_stage
                       : 0U;
+  AppTuneLogWrite(
+      time_ms, (uint8_t)tune->state, phase, tune->speed_pid.reference, position,
+      omega, actual_current, requested_current, executed_current,
+      fabsf(executed_current - requested_current) > 0.001f ||
+          fabsf(requested_current) >= 0.999f * tune->config.current_limit,
+      &tune->result.model);
   if (tune->state != g_app_tune_log_stage || phase != g_app_tune_log_phase)
   {
     char message[DEBUG_LOG_MAX_PAYLOAD];
@@ -286,12 +303,6 @@ void AppTuneLogAutotune(const AutotuneObject *tune, uint32_t time_ms,
     g_app_tune_log_stage = (uint8_t)tune->state;
     g_app_tune_log_phase = phase;
   }
-  AppTuneLogWrite(
-      time_ms, (uint8_t)tune->state, phase, tune->speed_pid.reference, position,
-      omega, actual_current, requested_current, executed_current,
-      fabsf(executed_current - requested_current) > 0.001f ||
-          fabsf(requested_current) >= 0.999f * tune->config.current_limit,
-      &tune->result.model);
 }
 
 /**
@@ -322,6 +333,14 @@ void AppTuneLogMotorTune(const MotorTuneObject *tune, uint32_t time_ms,
   }
   if (!active)
   {
+    AppTuneLogWrite(time_ms, (uint8_t)tune->state, (uint8_t)tune->error,
+                    tune->reference, position, omega, actual_current,
+                    tune->requested_current, tune->executed_current,
+                    fabsf(tune->executed_current - tune->requested_current) >
+                            0.001f ||
+                        fabsf(tune->requested_current) >=
+                            0.999f * tune->config.plant.current_limit,
+                    &tune->result.model);
     char message[DEBUG_LOG_MAX_PAYLOAD];
     if (tune->state == kMotorTuneComplete)
     {
@@ -344,27 +363,9 @@ void AppTuneLogMotorTune(const MotorTuneObject *tune, uint32_t time_ms,
         DebugLogError(&g_app_tune_log, time_ms, message);
       }
     }
-    AppTuneLogWrite(time_ms, (uint8_t)tune->state, (uint8_t)tune->error,
-                    tune->reference, position, omega, actual_current,
-                    tune->requested_current, tune->executed_current,
-                    fabsf(tune->executed_current - tune->requested_current) >
-                            0.001f ||
-                        fabsf(tune->requested_current) >=
-                            0.999f * tune->config.plant.current_limit,
-                    &tune->result.model);
     DebugLogStop(&g_app_tune_log, time_ms);
     g_app_tune_log_mode = kAppTuneLogNone;
     return;
-  }
-  if (tune->state != g_app_tune_log_stage ||
-      tune->candidate_index != g_app_tune_log_candidate)
-  {
-    char message[DEBUG_LOG_MAX_PAYLOAD];
-    (void)snprintf(message, sizeof(message), "STAGE %s CANDIDATE=%u",
-                   AppTuneMotorStage(tune->state), tune->candidate_index);
-    DebugLogInfo(&g_app_tune_log, time_ms, message);
-    g_app_tune_log_stage = (uint8_t)tune->state;
-    g_app_tune_log_candidate = tune->candidate_index;
   }
   uint8_t flags =
       tune->state == kMotorTuneSearch || tune->state == kMotorTuneValidate
@@ -377,4 +378,14 @@ void AppTuneLogMotorTune(const MotorTuneObject *tune, uint32_t time_ms,
           fabsf(tune->requested_current) >=
               0.999f * tune->config.plant.current_limit,
       &tune->result.model);
+  if (tune->state != g_app_tune_log_stage ||
+      tune->candidate_index != g_app_tune_log_candidate)
+  {
+    char message[DEBUG_LOG_MAX_PAYLOAD];
+    (void)snprintf(message, sizeof(message), "STAGE %s CANDIDATE=%u",
+                   AppTuneMotorStage(tune->state), tune->candidate_index);
+    DebugLogInfo(&g_app_tune_log, time_ms, message);
+    g_app_tune_log_stage = (uint8_t)tune->state;
+    g_app_tune_log_candidate = tune->candidate_index;
+  }
 }

@@ -6,7 +6,24 @@
 
 #include "bsp_pwm.h"
 #include "bsp_spi.h"
+#include "cmsis_os2.h"
 #include "main.h"
+
+static void Bmi088DelayMs(uint32_t ms)
+{
+  if (ms == 0U)
+  {
+    return;
+  }
+  if (osKernelGetState() == osKernelRunning)
+  {
+    (void)osDelay(ms);
+  }
+  else
+  {
+    HAL_Delay(ms);
+  }
+}
 
 enum
 {
@@ -127,10 +144,12 @@ void Bmi088ImuConfigInit(Bmi088ImuConfig *config, float dt)
   memset(config, 0, sizeof(*config));
   config->dt = dt;
   config->gravity = kBmi088DefaultGravity;
+  config->calibration_sample_delay_ms = 1U;
   config->is_init_euler_from_accel_enabled = true;
   config->init_euler_sample_count = 100U;
   config->init_euler_sample_delay_ms = 1U;
   config->motion_accel_lpf = kBmi088DefaultMotionAccelLpf;
+  config->lever_arm_diff_lpf = 0.02f;
   config->g_norm_motion_threshold = kBmi088DefaultGNormMotionThreshold;
   config->gyro_motion_threshold = kBmi088DefaultGyroMotionThreshold;
 }
@@ -170,18 +189,13 @@ static void Bmi088GyroDeselect(void)
   HAL_GPIO_WritePin(BMI088_GYRO_CS_GPIO_Port, BMI088_GYRO_CS_Pin, GPIO_PIN_SET);
 }
 
-/**
- * @brief 通过SPI阻塞传输单字节
- * @param hspi SPI句柄
- * @param data 发送字节
- * @return 接收字节
- */
-static uint8_t Bmi088TransferByte(SPI_HandleTypeDef *hspi, uint8_t data)
+static void Bmi088GuardDisableHook(void *device_ptr)
 {
-  uint8_t rx_data = 0;
-  (void)SpiTransmitReceiveBlocking(hspi, &data, &rx_data, 1U,
-                                   kBmi088SpiTimeoutMs);
-  return rx_data;
+  Bmi088Object *bmi088 = (Bmi088Object *)device_ptr;
+  if (bmi088 != NULL)
+  {
+    Bmi088HeaterDisable(bmi088);
+  }
 }
 
 /**
@@ -190,13 +204,13 @@ static uint8_t Bmi088TransferByte(SPI_HandleTypeDef *hspi, uint8_t data)
  * @param reg 寄存器地址
  * @param data 写入数据
  */
-static void Bmi088WriteRegister(SPI_HandleTypeDef *hspi, uint8_t reg,
+static bool Bmi088WriteRegister(SPI_HandleTypeDef *hspi, uint8_t reg,
                                 uint8_t data)
 {
   uint8_t tx_data[2] = {reg, data};
   uint8_t rx_data[2] = {0};
-  (void)SpiTransmitReceiveBlocking(hspi, tx_data, rx_data, sizeof(tx_data),
-                                   kBmi088SpiTimeoutMs);
+  return SpiTransmitReceiveBlocking(hspi, tx_data, rx_data, sizeof(tx_data),
+                                    kBmi088SpiTimeoutMs) == HAL_OK;
 }
 
 /**
@@ -209,8 +223,11 @@ static uint8_t Bmi088ReadGyroRegister(SPI_HandleTypeDef *hspi, uint8_t reg)
 {
   uint8_t tx_data[2] = {reg | kBmi088SpiReadMask, kBmi088SpiDummyData};
   uint8_t rx_data[2] = {0};
-  (void)SpiTransmitReceiveBlocking(hspi, tx_data, rx_data, sizeof(tx_data),
-                                   kBmi088SpiTimeoutMs);
+  if (SpiTransmitReceiveBlocking(hspi, tx_data, rx_data, sizeof(tx_data),
+                                 kBmi088SpiTimeoutMs) != HAL_OK)
+  {
+    return 0U;
+  }
   return rx_data[1];
 }
 
@@ -222,58 +239,75 @@ static uint8_t Bmi088ReadGyroRegister(SPI_HandleTypeDef *hspi, uint8_t reg)
  */
 static uint8_t Bmi088ReadAccelRegister(SPI_HandleTypeDef *hspi, uint8_t reg)
 {
-  uint8_t value = 0;
-
-  (void)Bmi088TransferByte(hspi, reg | kBmi088SpiReadMask);
-  (void)Bmi088TransferByte(hspi, kBmi088SpiDummyData);
-  value = Bmi088TransferByte(hspi, kBmi088SpiDummyData);
-
-  return value;
+  uint8_t tx_data[3] = {reg | kBmi088SpiReadMask, kBmi088SpiDummyData,
+                        kBmi088SpiDummyData};
+  uint8_t rx_data[3] = {0};
+  if (SpiTransmitReceiveBlocking(hspi, tx_data, rx_data, sizeof(tx_data),
+                                 kBmi088SpiTimeoutMs) != HAL_OK)
+  {
+    return 0U;
+  }
+  return rx_data[2];
 }
 
 /**
- * @brief 连续读取陀螺仪寄存器
+ * @brief 连续突发读取陀螺仪寄存器
  * @param hspi SPI句柄
  * @param reg 起始寄存器地址
  * @param data 输出数据缓冲区
- * @param length 读取长度
+ * @param length 读取长度（<= 15）
+ * @return true 表示传输成功
  */
-static void Bmi088ReadGyroRegisters(SPI_HandleTypeDef *hspi, uint8_t reg,
+static bool Bmi088ReadGyroRegisters(SPI_HandleTypeDef *hspi, uint8_t reg,
                                     uint8_t *data, uint8_t length)
 {
-  if (data == NULL || length == 0U)
+  if (data == NULL || length == 0U || length > 15U)
   {
-    return;
+    return false;
   }
 
-  (void)Bmi088TransferByte(hspi, reg | kBmi088SpiReadMask);
-  for (uint8_t i = 0; i < length; i++)
+  uint8_t tx_data[16];
+  uint8_t rx_data[16] = {0};
+  tx_data[0] = (uint8_t)(reg | kBmi088SpiReadMask);
+  memset(&tx_data[1], kBmi088SpiDummyData, length);
+  if (SpiTransmitReceiveBlocking(hspi, tx_data, rx_data,
+                                 (uint16_t)(length + 1U),
+                                 kBmi088SpiTimeoutMs) != HAL_OK)
   {
-    data[i] = Bmi088TransferByte(hspi, kBmi088SpiDummyData);
+    return false;
   }
+  memcpy(data, &rx_data[1], length);
+  return true;
 }
 
 /**
- * @brief 连续读取加速度计寄存器
+ * @brief 连续突发读取加速度计寄存器
  * @param hspi SPI句柄
  * @param reg 起始寄存器地址
  * @param data 输出数据缓冲区
- * @param length 读取长度
+ * @param length 读取长度（<= 14）
+ * @return true 表示传输成功
  */
-static void Bmi088ReadAccelRegisters(SPI_HandleTypeDef *hspi, uint8_t reg,
+static bool Bmi088ReadAccelRegisters(SPI_HandleTypeDef *hspi, uint8_t reg,
                                      uint8_t *data, uint8_t length)
 {
-  if (data == NULL || length == 0U)
+  if (data == NULL || length == 0U || length > 14U)
   {
-    return;
+    return false;
   }
 
-  (void)Bmi088TransferByte(hspi, reg | kBmi088SpiReadMask);
-  (void)Bmi088TransferByte(hspi, kBmi088SpiDummyData);
-  for (uint8_t i = 0; i < length; i++)
+  uint8_t tx_data[16];
+  uint8_t rx_data[16] = {0};
+  tx_data[0] = (uint8_t)(reg | kBmi088SpiReadMask);
+  memset(&tx_data[1], kBmi088SpiDummyData, (size_t)(length + 1U));
+  if (SpiTransmitReceiveBlocking(hspi, tx_data, rx_data,
+                                 (uint16_t)(length + 2U),
+                                 kBmi088SpiTimeoutMs) != HAL_OK)
   {
-    data[i] = Bmi088TransferByte(hspi, kBmi088SpiDummyData);
+    return false;
   }
+  memcpy(data, &rx_data[2], length);
+  return true;
 }
 
 /**
@@ -282,7 +316,7 @@ static void Bmi088ReadAccelRegisters(SPI_HandleTypeDef *hspi, uint8_t reg,
 static void Bmi088AccelWrite(SPI_HandleTypeDef *hspi, uint8_t reg, uint8_t data)
 {
   Bmi088AccelSelect();
-  Bmi088WriteRegister(hspi, reg, data);
+  (void)Bmi088WriteRegister(hspi, reg, data);
   Bmi088AccelDeselect();
 }
 
@@ -300,12 +334,13 @@ static uint8_t Bmi088AccelRead(SPI_HandleTypeDef *hspi, uint8_t reg)
 /**
  * @brief 带片选控制连续读加速度计寄存器
  */
-static void Bmi088AccelReadMulti(SPI_HandleTypeDef *hspi, uint8_t reg,
+static bool Bmi088AccelReadMulti(SPI_HandleTypeDef *hspi, uint8_t reg,
                                  uint8_t *data, uint8_t length)
 {
   Bmi088AccelSelect();
-  Bmi088ReadAccelRegisters(hspi, reg, data, length);
+  bool ok = Bmi088ReadAccelRegisters(hspi, reg, data, length);
   Bmi088AccelDeselect();
+  return ok;
 }
 
 /**
@@ -314,7 +349,7 @@ static void Bmi088AccelReadMulti(SPI_HandleTypeDef *hspi, uint8_t reg,
 static void Bmi088GyroWrite(SPI_HandleTypeDef *hspi, uint8_t reg, uint8_t data)
 {
   Bmi088GyroSelect();
-  Bmi088WriteRegister(hspi, reg, data);
+  (void)Bmi088WriteRegister(hspi, reg, data);
   Bmi088GyroDeselect();
 }
 
@@ -332,12 +367,13 @@ static uint8_t Bmi088GyroRead(SPI_HandleTypeDef *hspi, uint8_t reg)
 /**
  * @brief 带片选控制连续读陀螺仪寄存器
  */
-static void Bmi088GyroReadMulti(SPI_HandleTypeDef *hspi, uint8_t reg,
+static bool Bmi088GyroReadMulti(SPI_HandleTypeDef *hspi, uint8_t reg,
                                 uint8_t *data, uint8_t length)
 {
   Bmi088GyroSelect();
-  Bmi088ReadGyroRegisters(hspi, reg, data, length);
+  bool ok = Bmi088ReadGyroRegisters(hspi, reg, data, length);
   Bmi088GyroDeselect();
+  return ok;
 }
 
 /**
@@ -348,17 +384,17 @@ static void Bmi088GyroReadMulti(SPI_HandleTypeDef *hspi, uint8_t reg,
 static Bmi088Status Bmi088InitAccel(SPI_HandleTypeDef *hspi)
 {
   uint8_t chip_id = Bmi088AccelRead(hspi, kBmi088AccelChipIdReg);
-  HAL_Delay(kBmi088ComWaitMs);
+  Bmi088DelayMs(kBmi088ComWaitMs);
   chip_id = Bmi088AccelRead(hspi, kBmi088AccelChipIdReg);
-  HAL_Delay(kBmi088ComWaitMs);
+  Bmi088DelayMs(kBmi088ComWaitMs);
 
   Bmi088AccelWrite(hspi, kBmi088AccelSoftResetReg, kBmi088AccelSoftReset);
-  HAL_Delay(kBmi088LongDelayMs);
+  Bmi088DelayMs(kBmi088LongDelayMs);
 
   chip_id = Bmi088AccelRead(hspi, kBmi088AccelChipIdReg);
-  HAL_Delay(kBmi088ComWaitMs);
+  Bmi088DelayMs(kBmi088ComWaitMs);
   chip_id = Bmi088AccelRead(hspi, kBmi088AccelChipIdReg);
-  HAL_Delay(kBmi088ComWaitMs);
+  Bmi088DelayMs(kBmi088ComWaitMs);
   if (chip_id != kBmi088AccelChipIdValue)
   {
     return kBmi088NoSensor;
@@ -368,7 +404,7 @@ static Bmi088Status Bmi088InitAccel(SPI_HandleTypeDef *hspi)
   {
     Bmi088AccelWrite(hspi, kBmi088AccelConfig[i].reg,
                      kBmi088AccelConfig[i].value);
-    HAL_Delay(kBmi088ComWaitMs);
+    Bmi088DelayMs(kBmi088ComWaitMs);
     if (Bmi088AccelRead(hspi, kBmi088AccelConfig[i].reg) !=
         kBmi088AccelConfig[i].value)
     {
@@ -387,17 +423,17 @@ static Bmi088Status Bmi088InitAccel(SPI_HandleTypeDef *hspi)
 static Bmi088Status Bmi088InitGyro(SPI_HandleTypeDef *hspi)
 {
   uint8_t chip_id = Bmi088GyroRead(hspi, kBmi088GyroChipIdReg);
-  HAL_Delay(kBmi088ComWaitMs);
+  Bmi088DelayMs(kBmi088ComWaitMs);
   chip_id = Bmi088GyroRead(hspi, kBmi088GyroChipIdReg);
-  HAL_Delay(kBmi088ComWaitMs);
+  Bmi088DelayMs(kBmi088ComWaitMs);
 
   Bmi088GyroWrite(hspi, kBmi088GyroSoftResetReg, kBmi088GyroSoftReset);
-  HAL_Delay(kBmi088LongDelayMs);
+  Bmi088DelayMs(kBmi088LongDelayMs);
 
   chip_id = Bmi088GyroRead(hspi, kBmi088GyroChipIdReg);
-  HAL_Delay(kBmi088ComWaitMs);
+  Bmi088DelayMs(kBmi088ComWaitMs);
   chip_id = Bmi088GyroRead(hspi, kBmi088GyroChipIdReg);
-  HAL_Delay(kBmi088ComWaitMs);
+  Bmi088DelayMs(kBmi088ComWaitMs);
   if (chip_id != kBmi088GyroChipIdValue)
   {
     return kBmi088NoSensor;
@@ -406,7 +442,7 @@ static Bmi088Status Bmi088InitGyro(SPI_HandleTypeDef *hspi)
   for (uint8_t i = 0; i < kBmi088GyroConfigCount; i++)
   {
     Bmi088GyroWrite(hspi, kBmi088GyroConfig[i].reg, kBmi088GyroConfig[i].value);
-    HAL_Delay(kBmi088ComWaitMs);
+    Bmi088DelayMs(kBmi088ComWaitMs);
     if (Bmi088GyroRead(hspi, kBmi088GyroConfig[i].reg) !=
         kBmi088GyroConfig[i].value)
     {
@@ -521,13 +557,18 @@ static void Bmi088EarthToBody(const Euler *euler, const float earth_vector[3],
  * @brief 读取加速度计原始数据
  * @param bmi088 BMI088对象指针
  */
-static void Bmi088ReadRawAccel(Bmi088Object *bmi088)
+static bool Bmi088ReadRawAccel(Bmi088Object *bmi088)
 {
   uint8_t data[6] = {0};
-  Bmi088AccelReadMulti(bmi088->hspi, kBmi088AccelXoutLReg, data, sizeof(data));
+  if (!Bmi088AccelReadMulti(bmi088->hspi, kBmi088AccelXoutLReg, data,
+                            sizeof(data)))
+  {
+    return false;
+  }
   bmi088->raw.accel[0] = Bmi088BytesToInt16(data[0], data[1]);
   bmi088->raw.accel[1] = Bmi088BytesToInt16(data[2], data[3]);
   bmi088->raw.accel[2] = Bmi088BytesToInt16(data[4], data[5]);
+  return true;
 }
 
 /**
@@ -537,8 +578,9 @@ static void Bmi088ReadRawAccel(Bmi088Object *bmi088)
 static bool Bmi088ReadRawGyro(Bmi088Object *bmi088)
 {
   uint8_t data[8] = {0};
-  Bmi088GyroReadMulti(bmi088->hspi, kBmi088GyroChipIdReg, data, sizeof(data));
-  if (data[0] != kBmi088GyroChipIdValue)
+  if (!Bmi088GyroReadMulti(bmi088->hspi, kBmi088GyroChipIdReg, data,
+                           sizeof(data)) ||
+      data[0] != kBmi088GyroChipIdValue)
   {
     return false;
   }
@@ -553,18 +595,22 @@ static bool Bmi088ReadRawGyro(Bmi088Object *bmi088)
  * @brief 读取温度原始数据
  * @param bmi088 BMI088对象指针
  */
-static void Bmi088ReadRawTemperature(Bmi088Object *bmi088)
+static bool Bmi088ReadRawTemperature(Bmi088Object *bmi088)
 {
   uint8_t data[2] = {0};
   int16_t temperature = 0;
 
-  Bmi088AccelReadMulti(bmi088->hspi, kBmi088TempMReg, data, sizeof(data));
+  if (!Bmi088AccelReadMulti(bmi088->hspi, kBmi088TempMReg, data, sizeof(data)))
+  {
+    return false;
+  }
   temperature = (int16_t)(((uint16_t)data[0] << 3) | ((uint16_t)data[1] >> 5));
   if (temperature > 1023)
   {
     temperature -= 2048;
   }
   bmi088->raw.temperature = temperature;
+  return true;
 }
 
 /**
@@ -614,10 +660,6 @@ static void Bmi088UpdateMotionAccel(Bmi088Object *bmi088)
         bmi088->imu_ekf.dt / (bmi088->motion_accel_lpf + bmi088->imu_ekf.dt);
   }
 
-  LeverArmCompensatorUpdate(&bmi088->lever_arm, bmi088->corrected_accel,
-                            bmi088->imu_ekf.corrected_gyro_data,
-                            bmi088->imu_ekf.dt, bmi088->com_accel);
-
   for (uint8_t i = 0; i < 3U; i++)
   {
     motion_body_raw[i] = bmi088->com_accel[i] - gravity_body[i];
@@ -655,7 +697,7 @@ static void Bmi088InitEulerFromAccel(Bmi088Object *bmi088,
     }
     if (sample_delay_ms > 0U)
     {
-      HAL_Delay(sample_delay_ms);
+      Bmi088DelayMs(sample_delay_ms);
     }
   }
   for (uint8_t i = 0; i < 3U; i++)
@@ -694,8 +736,16 @@ Bmi088Status Bmi088Init(Bmi088Object *bmi088, SPI_HandleTypeDef *hspi)
   bmi088->motion_accel_lpf = kBmi088DefaultMotionAccelLpf;
   Bmi088ImuSetInstallMatrix(bmi088, NULL);
 
+  PeripheralOps ops = {
+      .on_enable = NULL,
+      .on_disable = Bmi088GuardDisableHook,
+      .on_offline = Bmi088GuardDisableHook,
+      .on_resync = NULL,
+      .on_clear_fault = NULL,
+      .on_reconnect_probe = NULL,
+  };
   PeripheralGuardInit(&bmi088->guard, "bmi088", kPeripheralTypeImu,
-                      kPeripheralDefaultTimeoutImuMs, bmi088, NULL);
+                      kPeripheralDefaultTimeoutImuMs, bmi088, &ops);
 
   Bmi088AccelDeselect();
   Bmi088GyroDeselect();
@@ -730,9 +780,8 @@ Bmi088Status Bmi088Update(Bmi088Object *bmi088)
     return kBmi088NoSensor;
   }
 
-  Bmi088ReadRawAccel(bmi088);
-  Bmi088ReadRawTemperature(bmi088);
-  if (!Bmi088ReadRawGyro(bmi088))
+  if (!Bmi088ReadRawAccel(bmi088) || !Bmi088ReadRawTemperature(bmi088) ||
+      !Bmi088ReadRawGyro(bmi088))
   {
     bmi088->status = kBmi088NoSensor;
     PeripheralGuardTriggerFault(&bmi088->guard, (uint32_t)bmi088->status);
@@ -861,8 +910,17 @@ Bmi088Status Bmi088ImuUpdate(Bmi088Object *bmi088)
     bmi088->heater_duty_ratio = Bmi088HeaterControl(bmi088);
   }
 
-  bmi088->imu_ekf_status = ImuEkfStep(&bmi088->imu_ekf, bmi088->corrected_gyro,
-                                      bmi088->corrected_accel);
+  // 先执行刚体杆臂效应补偿得到质心加速度 com_accel，再送入 IMU EKF，防止向心/切向加速度拉偏姿态
+  float lever_gyro[3] = {
+      bmi088->corrected_gyro[0] - bmi088->imu_ekf.x_data[3],
+      bmi088->corrected_gyro[1] - bmi088->imu_ekf.x_data[4],
+      bmi088->corrected_gyro[2] - bmi088->imu_ekf.x_data[5],
+  };
+  LeverArmCompensatorUpdate(&bmi088->lever_arm, bmi088->corrected_accel,
+                            lever_gyro, bmi088->imu_ekf.dt, bmi088->com_accel);
+
+  bmi088->imu_ekf_status =
+      ImuEkfStep(&bmi088->imu_ekf, bmi088->corrected_gyro, bmi088->com_accel);
   if (bmi088->imu_ekf_status != ARM_MATH_SUCCESS)
   {
     bmi088->status = kBmi088ImuEkfUpdateError;
@@ -1061,7 +1119,7 @@ Bmi088Status Bmi088ImuCalibrate(Bmi088Object *bmi088, uint16_t sample_count,
 
     if (sample_delay_ms > 0U)
     {
-      HAL_Delay(sample_delay_ms);
+      Bmi088DelayMs(sample_delay_ms);
     }
   }
 
@@ -1144,7 +1202,7 @@ Bmi088Status Bmi088CalibrateGyroOffset(Bmi088Object *bmi088,
     }
     if (sample_delay_ms > 0U)
     {
-      HAL_Delay(sample_delay_ms);
+      Bmi088DelayMs(sample_delay_ms);
     }
   }
 

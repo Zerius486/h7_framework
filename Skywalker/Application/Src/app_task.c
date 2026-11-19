@@ -8,6 +8,16 @@ static uint32_t AppTaskNormalizePeriod(uint32_t period_ms)
   return period_ms == 0U ? 1U : period_ms;
 }
 
+static void AppTaskDelayUntil(uint32_t *next_wake_time, uint32_t period_ms)
+{
+  *next_wake_time += period_ms;
+  if (osDelayUntil(*next_wake_time) != osOK)
+  {
+    (void)osDelay(1U);
+    *next_wake_time = osKernelGetTickCount();
+  }
+}
+
 // 默认为空实现，Application层可覆盖。
 __weak uint32_t ManagerTaskInit(void)
 {
@@ -50,8 +60,7 @@ void StartManger(void *argument)
   for (;;)
   {
     ManagerTaskLoop();
-    next_wake_time += period_ms;
-    osDelayUntil(next_wake_time);
+    AppTaskDelayUntil(&next_wake_time, period_ms);
   }
 }
 
@@ -67,8 +76,7 @@ void StartGimbal(void *argument)
   for (;;)
   {
     GimbalTaskLoop();
-    next_wake_time += period_ms;
-    osDelayUntil(next_wake_time);
+    AppTaskDelayUntil(&next_wake_time, period_ms);
   }
 }
 
@@ -84,8 +92,7 @@ void StartChassis(void *argument)
   for (;;)
   {
     ChassisTaskLoop();
-    next_wake_time += period_ms;
-    osDelayUntil(next_wake_time);
+    AppTaskDelayUntil(&next_wake_time, period_ms);
   }
 }
 
@@ -102,7 +109,6 @@ void StartShoot(void *argument)
   for (;;)
   {
     ShootTaskLoop();
-    next_wake_time += period_ms;
-    osDelayUntil(next_wake_time);
+    AppTaskDelayUntil(&next_wake_time, period_ms);
   }
 }

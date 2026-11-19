@@ -9,6 +9,7 @@
 void ProfileInit(void)
 {
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->LAR = 0xC5ACCE55UL;
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
 

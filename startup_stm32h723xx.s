@@ -95,6 +95,34 @@ LoopFillZerobss:
   cmp r2, r4
   bcc FillZerobss
 
+/* Zero fill the .dma_buffer segment in RAM_D2. */
+  ldr r2, =_sdma_buffer
+  ldr r4, =_edma_buffer
+  movs r3, #0
+  b LoopFillZeroDmaBuffer
+
+FillZeroDmaBuffer:
+  str  r3, [r2]
+  adds r2, r2, #4
+
+LoopFillZeroDmaBuffer:
+  cmp r2, r4
+  bcc FillZeroDmaBuffer
+
+/* Zero fill the .dtcmram segment in DTCMRAM. */
+  ldr r2, =_sdtcmram
+  ldr r4, =_edtcmram
+  movs r3, #0
+  b LoopFillZeroDtcmram
+
+FillZeroDtcmram:
+  str  r3, [r2]
+  adds r2, r2, #4
+
+LoopFillZeroDtcmram:
+  cmp r2, r4
+  bcc FillZeroDtcmram
+
 /* Call static constructors */
     bl __libc_init_array
 /* Call the application's entry point.*/

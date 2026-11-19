@@ -111,6 +111,10 @@ float DjiMotorCurrentUnitsToAmperes(DjiMotorType type, int16_t current_units)
  */
 int16_t DjiMotorCurrentAmperesToUnits(DjiMotorType type, float current_a)
 {
+  if (!isfinite(current_a))
+  {
+    return 0;
+  }
   switch (type)
   {
   case kDjiMotorM2006:
@@ -238,8 +242,7 @@ void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data)
 
   if (motor->type == kDjiMotorM3508 || motor->type == kDjiMotorGm6020)
   {
-    motor->state.temperature =
-        (float)(motor->type == kDjiMotorGm6020 ? rx_data[7] : rx_data[6]);
+    motor->state.temperature = (float)rx_data[6];
   }
 }
 
@@ -254,9 +257,7 @@ void DjiMotorCurrentCalculate(DjiMotor *motor)
     return;
   }
   DjiMotorCurrentCalculateWithFeedback(
-      motor, motor->type == kDjiMotorGm6020 ? motor->state.continuous_angle
-                                           : motor->state.angle,
-      motor->state.omega);
+      motor, motor->state.continuous_angle, motor->state.omega);
 }
 
 /**

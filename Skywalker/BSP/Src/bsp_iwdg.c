@@ -28,7 +28,12 @@ bool BspIwdgInit(uint32_t timeout_ms)
   g_hiwdg1.Init.Window = IWDG_WINDOW_DISABLE;
   g_hiwdg1.Init.Reload = reload;
 
-  return HAL_IWDG_Init(&g_hiwdg1) == HAL_OK;
+  if (HAL_IWDG_Init(&g_hiwdg1) != HAL_OK)
+  {
+    g_hiwdg1.Instance = NULL;
+    return false;
+  }
+  return true;
 }
 
 void BspIwdgFeed(void)

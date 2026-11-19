@@ -60,8 +60,17 @@ static void UartStartRxDma(uint32_t index)
     return;
   }
 
-  (void)HAL_UARTEx_ReceiveToIdle_DMA(
-      huart, g_uart_object[index].rx_buffer_active, kUartBufferSize);
+  __HAL_UART_CLEAR_FLAG(huart, UART_CLEAR_OREF | UART_CLEAR_FEF |
+                                   UART_CLEAR_NEF | UART_CLEAR_PEF);
+  if (HAL_UARTEx_ReceiveToIdle_DMA(huart, g_uart_object[index].rx_buffer_active,
+                                   kUartBufferSize) != HAL_OK)
+  {
+    (void)HAL_UART_AbortReceive(huart);
+    __HAL_UART_CLEAR_FLAG(huart, UART_CLEAR_OREF | UART_CLEAR_FEF |
+                                     UART_CLEAR_NEF | UART_CLEAR_PEF);
+    (void)HAL_UARTEx_ReceiveToIdle_DMA(
+        huart, g_uart_object[index].rx_buffer_active, kUartBufferSize);
+  }
   UartDisableHalfTransferIt(huart);
 }
 
@@ -110,14 +119,30 @@ bool UartTransmitTry(UART_HandleTypeDef *huart, uint8_t *tx_data,
 {
   uint32_t index = UartIndex(huart);
   if (index == 0xFFU || tx_data == NULL || tx_length == 0U ||
-      tx_length > kUartBufferSize || !UartTransmitReady(huart))
+      tx_length > kUartBufferSize)
   {
     return false;
   }
 
+  uint32_t primask = __get_PRIMASK();
+  __disable_irq();
+  if (!UartTransmitReady(huart))
+  {
+    if (primask == 0U)
+    {
+      __enable_irq();
+    }
+    return false;
+  }
+
   memcpy(g_uart_object[index].tx_buffer, tx_data, tx_length);
-  return HAL_UART_Transmit_DMA(huart, g_uart_object[index].tx_buffer,
-                               tx_length) == HAL_OK;
+  HAL_StatusTypeDef status =
+      HAL_UART_Transmit_DMA(huart, g_uart_object[index].tx_buffer, tx_length);
+  if (primask == 0U)
+  {
+    __enable_irq();
+  }
+  return status == HAL_OK;
 }
 
 /**
@@ -141,6 +166,11 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t rx_length)
 {
   uint32_t index = UartIndex(huart);
   if (index == 0xFFU)
+  {
+    return;
+  }
+
+  if (HAL_UARTEx_GetRxEventType(huart) == HAL_UART_RXEVENT_HT)
   {
     return;
   }
@@ -173,7 +203,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t rx_length)
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
   uint32_t index = UartIndex(huart);
-  if (index == 0xFFU)
+  if (index == 0xFFU || g_uart_object[index].huart == NULL ||
+      g_uart_object[index].rx_buffer_active == NULL)
   {
     return;
   }

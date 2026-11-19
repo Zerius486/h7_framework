@@ -216,9 +216,11 @@ SECTIONS
 
   .dma_buffer (NOLOAD) : ALIGN(32)
   {
+    _sdma_buffer = .;
     *(.dma_buffer)
     *(.dma_buffer*)
     . = ALIGN(32);
+    _edma_buffer = .;
   } >RAM_D2
 
   .bss (NOLOAD) : ALIGN(4)
@@ -239,9 +241,11 @@ SECTIONS
 
   .dtcmram (NOLOAD) : ALIGN(4)
   {
+    _sdtcmram = .;
     *(.dtcmram)
     *(.dtcmram*)
     . = ALIGN(4);
+    _edtcmram = .;
   } >DTCMRAM
 
   /* User_heap_stack section, used to check that there is enough RAM left */

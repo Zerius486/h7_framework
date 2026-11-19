@@ -35,7 +35,7 @@ _Static_assert(sizeof(RefereeMapCommand) == 12U, "RefereeMapCommand size mismatc
 _Static_assert(sizeof(RefereeMapRobotData) == 48U, "RefereeMapRobotData size mismatch");
 _Static_assert(sizeof(RefereeMapData) == 105U, "RefereeMapData size mismatch");
 _Static_assert(sizeof(RefereeCustomInfo) == 34U, "RefereeCustomInfo size mismatch");
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
 _Static_assert(sizeof(RefereeDartInfo) == 3U, "RefereeDartInfo size mismatch");
 _Static_assert(sizeof(RefereeDartClientCmd) == 6U, "RefereeDartClientCmd size mismatch");
 _Static_assert(sizeof(RefereeRadarMarkData) == 2U, "RefereeRadarMarkData size mismatch");
@@ -275,7 +275,7 @@ void RefereeUpdate(RefereeObject *referee)
       RefereeCopyData(&referee->referee_warning,
                       sizeof(referee->referee_warning), data, data_length);
       break;
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
     case kRefereeCmdDartInfo:
       RefereeCopyData(&referee->dart_info, sizeof(referee->dart_info), data,
                       data_length);
@@ -312,7 +312,7 @@ void RefereeUpdate(RefereeObject *referee)
       RefereeCopyData(&referee->rfid_status, sizeof(referee->rfid_status), data,
                       data_length);
       break;
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
     case kRefereeCmdDartClientCmd:
       RefereeCopyData(&referee->dart_client_cmd,
                       sizeof(referee->dart_client_cmd), data, data_length);
@@ -323,7 +323,7 @@ void RefereeUpdate(RefereeObject *referee)
                       sizeof(referee->ground_robot_position), data,
                       data_length);
       break;
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
     case kRefereeCmdRadarMarkData:
       RefereeCopyData(&referee->radar_mark_data,
                       sizeof(referee->radar_mark_data), data, data_length);
@@ -333,7 +333,7 @@ void RefereeUpdate(RefereeObject *referee)
       RefereeCopyData(&referee->sentry_info, sizeof(referee->sentry_info), data,
                       data_length);
       break;
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
     case kRefereeCmdRadarInfo:
       RefereeCopyData(&referee->radar_info, sizeof(referee->radar_info), data,
                       data_length);
@@ -470,13 +470,12 @@ bool RefereeSend(RefereeObject *referee, uint16_t cmd_id, const uint8_t *data,
     return false;
   }
 
-  uint8_t tx_buffer[kUartBufferSize];
   uint16_t frame_length = 0;
-  if (!RefereePackFrame(referee, cmd_id, data, data_length, tx_buffer,
-                        sizeof(tx_buffer), &frame_length))
+  if (!RefereePackFrame(referee, cmd_id, data, data_length, referee->tx_buffer,
+                        sizeof(referee->tx_buffer), &frame_length))
   {
     return false;
   }
 
-  return UartTransmitTry(referee->tx_huart, tx_buffer, frame_length);
+  return UartTransmitTry(referee->tx_huart, referee->tx_buffer, frame_length);
 }

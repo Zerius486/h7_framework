@@ -55,16 +55,36 @@ void SpiTransmitReceive(SPI_HandleTypeDef *hspi, uint8_t *tx_data,
 {
   uint32_t index = SpiIndex(hspi);
   if (index == 0xFFU || tx_data == NULL || length == 0U ||
-      length > kSpiBufferSize || hspi->State != HAL_SPI_STATE_READY)
+      length > kSpiBufferSize)
   {
+    return;
+  }
+
+  uint32_t primask = __get_PRIMASK();
+  __disable_irq();
+  if (hspi->State != HAL_SPI_STATE_READY)
+  {
+    if (primask == 0U)
+    {
+      __enable_irq();
+    }
     return;
   }
 
   memcpy(g_spi_object[index].tx_buffer, tx_data, length);
   g_spi_object[index].rx_buffer_user = rx_data;
   g_spi_object[index].transfer_length = length;
-  (void)HAL_SPI_TransmitReceive_DMA(hspi, g_spi_object[index].tx_buffer,
-                                    g_spi_object[index].rx_buffer, length);
+  if (HAL_SPI_TransmitReceive_DMA(hspi, g_spi_object[index].tx_buffer,
+                                  g_spi_object[index].rx_buffer,
+                                  length) != HAL_OK)
+  {
+    g_spi_object[index].rx_buffer_user = NULL;
+    g_spi_object[index].transfer_length = 0;
+  }
+  if (primask == 0U)
+  {
+    __enable_irq();
+  }
 }
 
 HAL_StatusTypeDef SpiTransmitReceiveBlocking(SPI_HandleTypeDef *hspi,
@@ -94,20 +114,21 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
   }
 
   uint16_t transfer_length = g_spi_object[index].transfer_length;
-  if (g_spi_object[index].rx_buffer_user != NULL && transfer_length > 0U)
+  uint8_t *rx_buffer_user = g_spi_object[index].rx_buffer_user;
+  SpiRxCallback callback = g_spi_object[index].callback;
+  if (rx_buffer_user != NULL && transfer_length > 0U)
   {
-    memcpy(g_spi_object[index].rx_buffer_user, g_spi_object[index].rx_buffer,
-           transfer_length);
+    memcpy(rx_buffer_user, g_spi_object[index].rx_buffer, transfer_length);
   }
 
-  if (g_spi_object[index].callback != NULL)
-  {
-    g_spi_object[index].callback(g_spi_object[index].rx_buffer,
-                                 transfer_length);
-  }
-
+  // 在调用用户回调前清空状态，避免回调内链式发起下一次 DMA 传输后被覆盖
   g_spi_object[index].rx_buffer_user = NULL;
   g_spi_object[index].transfer_length = 0;
+
+  if (callback != NULL)
+  {
+    callback(g_spi_object[index].rx_buffer, transfer_length);
+  }
 }
 
 /**

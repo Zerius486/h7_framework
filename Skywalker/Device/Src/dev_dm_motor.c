@@ -60,8 +60,16 @@ static void DmMotorGuardOfflineHook(void *device_ptr)
 static uint16_t DmMotorFloatToUint(float value, float min, float max,
                                    uint8_t bits)
 {
-  value = MathClamp(value, min, max);
   float span = max - min;
+  if (!isfinite(span) || span <= 0.0f)
+  {
+    return 0U;
+  }
+  if (!isfinite(value))
+  {
+    value = (min <= 0.0f && max >= 0.0f) ? 0.0f : min;
+  }
+  value = MathClamp(value, min, max);
   uint32_t max_int = (1UL << bits) - 1UL;
   return (uint16_t)((value - min) * (float)max_int / span);
 }
@@ -194,10 +202,18 @@ void DmMotorResetUnwrap(DmMotor *motor)
   {
     return;
   }
+  uint32_t primask = __get_PRIMASK();
+  __disable_irq();
   motor->state.wraps = 0;
+  motor->state.raw_angle = 0.0f;
   motor->state.previous_raw_angle = 0.0f;
   motor->state.continuous_angle = 0.0;
+  motor->state.angle = 0.0f;
   motor->state.angle_initialized = false;
+  if (primask == 0U)
+  {
+    __enable_irq();
+  }
 }
 
 /**
@@ -242,6 +258,10 @@ void DmMotorUpdate(DmMotor *motor, const uint8_t rx_data[8])
   else if (PeripheralIsFault(&motor->guard))
   {
     PeripheralGuardClearFault(&motor->guard);
+  }
+  if (motor->state.error_code == 0x00U && PeripheralIsEnabled(&motor->guard))
+  {
+    (void)PeripheralGuardDisable(&motor->guard);
   }
 
   float half_span = motor->limits.position_max;
@@ -297,7 +317,12 @@ void DmMotorPackCommand(DmMotor *motor, DmMotorCommand command,
 
   if (command == kDmMotorCommandEnable)
   {
-    (void)PeripheralGuardEnable(&motor->guard);
+    if (PeripheralIsFault(&motor->guard) ||
+        !PeripheralGuardEnable(&motor->guard))
+    {
+      tx_data[7] = (uint8_t)kDmMotorCommandDisable;
+      return;
+    }
   }
   else if (command == kDmMotorCommandDisable)
   {
@@ -333,6 +358,7 @@ void DmMotorPackDisable(DmMotor *motor, uint8_t tx_data[8])
 void DmMotorPackZeroOffset(DmMotor *motor, uint8_t tx_data[8])
 {
   DmMotorPackCommand(motor, kDmMotorCommandZeroOffset, tx_data);
+  DmMotorResetUnwrap(motor);
 }
 
 /**
@@ -367,9 +393,23 @@ void DmMotorPackMit(const DmMotor *motor, uint8_t tx_data[8])
     kd = 0.0f;
   }
 
-  uint16_t position =
-      DmMotorFloatToUint(motor->state.given_angle, -motor->limits.position_max,
-                         motor->limits.position_max, 16);
+  // 将多圈连续给定角度按当前 wraps 折算回电机单窗协议区间 [-position_max, +position_max]
+  float target_angle = motor->state.given_angle;
+  if (!isfinite(target_angle))
+  {
+    target_angle =
+        isfinite(motor->state.raw_angle) ? motor->state.raw_angle : 0.0f;
+  }
+  else if (motor->state.angle_initialized && motor->limits.position_max > 0.0f)
+  {
+    double span = 2.0 * (double)motor->limits.position_max;
+    target_angle =
+        (float)((double)target_angle - (double)motor->state.wraps * span);
+  }
+
+  uint16_t position = DmMotorFloatToUint(target_angle,
+                                         -motor->limits.position_max,
+                                         motor->limits.position_max, 16);
   uint16_t velocity =
       DmMotorFloatToUint(motor->state.given_omega, -motor->limits.velocity_max,
                          motor->limits.velocity_max, 12);
@@ -403,11 +443,15 @@ void DmMotorPackPositionVelocity(const DmMotor *motor, uint8_t tx_data[8])
     return;
   }
 
-  float angle = motor->state.given_angle;
-  float omega = motor->state.given_omega;
+  float safe_angle =
+      isfinite(motor->state.angle) ? motor->state.angle : 0.0f;
+  float angle = isfinite(motor->state.given_angle) ? motor->state.given_angle
+                                                   : safe_angle;
+  float omega =
+      isfinite(motor->state.given_omega) ? motor->state.given_omega : 0.0f;
   if (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard))
   {
-    angle = motor->state.angle;
+    angle = safe_angle;
     omega = 0.0f;
   }
 
@@ -427,7 +471,8 @@ void DmMotorPackVelocity(const DmMotor *motor, uint8_t tx_data[8])
     return;
   }
 
-  float omega = (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard))
+  float omega = (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard) ||
+                 !isfinite(motor->state.given_omega))
                     ? 0.0f
                     : motor->state.given_omega;
   DmMotorPackFloat(omega, &tx_data[0]);
@@ -446,12 +491,15 @@ void DmMotorPackForcePosition(const DmMotor *motor, uint8_t tx_data[8])
     return;
   }
 
-  float angle = motor->state.given_angle;
+  float safe_angle =
+      isfinite(motor->state.angle) ? motor->state.angle : 0.0f;
+  float angle = isfinite(motor->state.given_angle) ? motor->state.given_angle
+                                                   : safe_angle;
   uint16_t velocity_limit = motor->state.velocity_limit;
   uint16_t current_limit = motor->state.current_limit;
   if (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard))
   {
-    angle = motor->state.angle;
+    angle = safe_angle;
     velocity_limit = 0U;
     current_limit = 0U;
   }

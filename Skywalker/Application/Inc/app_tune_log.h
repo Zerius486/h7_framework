@@ -9,6 +9,7 @@
 
 void AppTuneLogInit(const DebugLogConfig *config);
 void AppTuneLogProcess(void);
+void AppTuneLogFlushIdle(void);
 void AppTuneLogAutotune(const AutotuneObject *tune, uint32_t time_ms,
                         float position, float omega, float actual_current,
                         float requested_current, float executed_current);

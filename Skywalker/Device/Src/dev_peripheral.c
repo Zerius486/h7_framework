@@ -124,6 +124,12 @@ void PeripheralGuardFeed(PeripheralGuard *guard, uint32_t now_tick) {
   }
 }
 
+static inline uint32_t PeripheralElapsedTick(uint32_t now_tick,
+                                             uint32_t past_tick) {
+  int32_t diff = (int32_t)(now_tick - past_tick);
+  return (diff > 0) ? (uint32_t)diff : 0U;
+}
+
 void PeripheralGuardUpdate(PeripheralGuard *guard, uint32_t now_tick) {
   if (guard == NULL) {
     return;
@@ -145,7 +151,7 @@ void PeripheralGuardUpdate(PeripheralGuard *guard, uint32_t now_tick) {
     // 若已收过报文则按 last_rx_tick 计时；若尚在 Probing 且未收到首帧，则按入态时间计时以允许 Probing 超时转入 Offline
     uint32_t reference_tick =
         guard->has_rx_frame ? guard->last_rx_tick : guard->state_enter_tick;
-    if ((now_tick - reference_tick) > guard->timeout_ms) {
+    if (PeripheralElapsedTick(now_tick, reference_tick) > guard->timeout_ms) {
       guard->last_state = guard->state;
       guard->state = kPeripheralStateOffline;
       guard->state_enter_tick = now_tick;
@@ -157,7 +163,8 @@ void PeripheralGuardUpdate(PeripheralGuard *guard, uint32_t now_tick) {
   // 2. 离线状态下的低频重连探测脉冲（5~10Hz）
   if (guard->state == kPeripheralStateOffline) {
     if (!guard->has_probe_tick ||
-        (now_tick - guard->last_probe_tick) >= guard->reconnect_interval_ms) {
+        PeripheralElapsedTick(now_tick, guard->last_probe_tick) >=
+            guard->reconnect_interval_ms) {
       guard->last_probe_tick = now_tick;
       guard->has_probe_tick = true;
       trigger_probe = true;
@@ -168,7 +175,7 @@ void PeripheralGuardUpdate(PeripheralGuard *guard, uint32_t now_tick) {
   if (!guard->has_fps_tick) {
     guard->last_fps_tick = now_tick;
     guard->has_fps_tick = true;
-  } else if ((now_tick - guard->last_fps_tick) >= 1000U) {
+  } else if (PeripheralElapsedTick(now_tick, guard->last_fps_tick) >= 1000U) {
     guard->rx_fps = guard->rx_fps_counter;
     guard->rx_fps_counter = 0U;
     guard->last_fps_tick = now_tick;

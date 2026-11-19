@@ -116,7 +116,8 @@ int main(void)
   MX_SPI2_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-
+  /* 禁用未使用的 BMI088 EXTI 中断，避免 3.6 kHz 空转抢占 */
+  HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -199,7 +200,8 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 /**
-  * @brief  配置 MPU 区域：RAM_D2 (0x30000000, 32KB) 设为 Normal Non-Cacheable
+  * @brief  配置 MPU 区域：RAM_D2 (0x30000000, 32KB) 设为 Normal Non-Cacheable，
+  *         并禁止外部 FMC/OCTOSPI 地址空间的推测访问以防止 Cortex-M7 AXI 总线死锁
   * @retval None
   */
 static void MPU_Config(void)
@@ -219,8 +221,25 @@ static void MPU_Config(void)
   mpu_init.IsShareable = MPU_ACCESS_SHAREABLE;
   mpu_init.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
   mpu_init.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
-
   HAL_MPU_ConfigRegion(&mpu_init);
+
+  mpu_init.Enable = MPU_REGION_ENABLE;
+  mpu_init.Number = MPU_REGION_NUMBER1;
+  mpu_init.BaseAddress = 0x60000000U;
+  mpu_init.Size = MPU_REGION_SIZE_512MB;
+  mpu_init.SubRegionDisable = 0x00U;
+  mpu_init.TypeExtField = MPU_TEX_LEVEL0;
+  mpu_init.AccessPermission = MPU_REGION_NO_ACCESS;
+  mpu_init.DisableExec = MPU_INSTRUCTION_ACCESS_DISABLE;
+  mpu_init.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
+  mpu_init.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+  mpu_init.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+  HAL_MPU_ConfigRegion(&mpu_init);
+
+  mpu_init.Number = MPU_REGION_NUMBER2;
+  mpu_init.BaseAddress = 0x80000000U;
+  HAL_MPU_ConfigRegion(&mpu_init);
+
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 }
 /* USER CODE END 4 */

@@ -117,6 +117,12 @@ void LkMotorUpdate(LkMotor *motor, const uint8_t rx_data[8])
   // 先刷新外设心跳喂狗，若刚从离线态恢复则先触发 on_resync 重置多圈展开基准
   PeripheralGuardFeed(&motor->guard, HAL_GetTick());
 
+  // 仅解析电机实时状态反馈帧（0x9C 读取状态2，0xA1~0xA8 闭环控制回复）
+  if (rx_data[0] != 0x9CU && (rx_data[0] < 0xA1U || rx_data[0] > 0xA8U))
+  {
+    return;
+  }
+
   motor->state.last_encoder = motor->state.encoder;
   motor->state.encoder =
       (uint16_t)(((uint16_t)rx_data[7] << 8) | (uint16_t)rx_data[6]);

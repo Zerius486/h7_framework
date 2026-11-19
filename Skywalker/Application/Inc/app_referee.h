@@ -9,12 +9,15 @@
 #include "dev_peripheral.h"
 
 // 裁判系统协议模式开关：默认 RMUL（高校联盟赛），可通过 CMake -DREFEREE_MODE=RMUC 切换
-#if !defined(REFEREE_MODE_RMUC) && !defined(REFEREE_MODE_RMUL)
-#define REFEREE_MODE_RMUL 1
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0) && \
+    defined(REFEREE_MODE_RMUL) && (REFEREE_MODE_RMUL != 0)
+#error "REFEREE_MODE_RMUC and REFEREE_MODE_RMUL cannot both be enabled."
 #endif
 
-#if defined(REFEREE_MODE_RMUC) && defined(REFEREE_MODE_RMUL)
-#error "REFEREE_MODE_RMUC and REFEREE_MODE_RMUL cannot both be defined."
+#if (!defined(REFEREE_MODE_RMUC) || (REFEREE_MODE_RMUC == 0)) && \
+    (!defined(REFEREE_MODE_RMUL) || (REFEREE_MODE_RMUL == 0))
+#undef REFEREE_MODE_RMUL
+#define REFEREE_MODE_RMUL 1
 #endif
 
 enum
@@ -126,7 +129,7 @@ typedef union
     uint32_t event_data;   // 场地事件数据 1
     uint32_t event_data_2; // 场地事件数据 2
   } raw;
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
   struct
   {
     uint32_t supply_zone : 1;           // bit0: 己方补给区占领状态
@@ -150,7 +153,7 @@ typedef union
     uint32_t enemy_dart_hit_target : 3; // bit13-15: 敌方飞镖最后一次击中目标
     uint32_t reserved : 16;             // bit16-31: 保留
   } bits;
-#elif defined(REFEREE_MODE_RMUL)
+#elif defined(REFEREE_MODE_RMUL) && (REFEREE_MODE_RMUL != 0)
   struct
   {
     uint32_t supply_zone : 1;      // bit0: 己方补给区占领状态
@@ -176,7 +179,7 @@ typedef struct
   uint8_t count;              // 对应判罚等级的违规次数
 } RefereeWarning;
 
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
 // 0x0105 (3B, RMUC)
 typedef struct
 {
@@ -267,7 +270,7 @@ typedef union
     uint32_t rfid_status;   // RFID 状态字 1
     uint16_t rfid_status_2; // RFID 状态字 2
   } raw;
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
   struct
   {
     uint32_t supply_zone : 1;        // bit0: 己方补给区
@@ -279,7 +282,7 @@ typedef union
     uint16_t terrain_cross_high : 9; // bit0-8: 地形跨越增益点高位
     uint16_t reserved2 : 7;          // bit9-15: 保留
   } bits;
-#elif defined(REFEREE_MODE_RMUL)
+#elif defined(REFEREE_MODE_RMUL) && (REFEREE_MODE_RMUL != 0)
   struct
   {
     uint32_t supply_zone : 1;        // bit0: 己方补给区
@@ -296,7 +299,7 @@ typedef union
 #endif
 } RefereeRfidStatus;
 
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
 // 0x020A (6B, RMUC)
 typedef struct
 {
@@ -322,7 +325,7 @@ typedef struct
   float reserved4;       // 保留
 } RefereeGroundRobotPosition;
 
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
 // 0x020C (2B, RMUC)
 typedef struct
 {
@@ -338,7 +341,7 @@ typedef struct
   uint64_t sentry_info_3; // 哨兵自主决策信息 3
 } RefereeSentryInfo;
 
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
 // 0x020E (8B, RMUC)
 typedef struct
 {
@@ -509,6 +512,7 @@ typedef struct
   uint8_t rx_stream[kRefereeRxStreamSize]; // 流式接收缓存
   StreamBuffer rx_stream_buffer;           // 流式接收缓存状态
   uint8_t tx_sequence;                     // 发送包序号
+  uint8_t tx_buffer[kUartBufferSize];      // 发送帧组装缓存
   uint32_t received_frame_count;           // 已接收有效帧计数
   uint32_t dropped_frame_count;            // 丢弃帧计数
   PeripheralGuard guard;                   // 统一外设生命周期守护对象
@@ -529,7 +533,7 @@ typedef struct
   RefereeRfidStatus rfid_status;
   RefereeGroundRobotPosition ground_robot_position;
   RefereeSentryInfo sentry_info;
-#if defined(REFEREE_MODE_RMUC)
+#if defined(REFEREE_MODE_RMUC) && (REFEREE_MODE_RMUC != 0)
   RefereeDartInfo dart_info;
   RefereeDartClientCmd dart_client_cmd;
   RefereeRadarMarkData radar_mark_data;

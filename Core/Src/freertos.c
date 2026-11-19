@@ -52,7 +52,7 @@
 osThreadId_t ManagerHandle;
 const osThreadAttr_t Manager_attributes = {
   .name = "Manager",
-  .stack_size = 512 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityBelowNormal,
 };
 /* Definitions for Gimbal */
@@ -66,14 +66,14 @@ const osThreadAttr_t Gimbal_attributes = {
 osThreadId_t ChassisHandle;
 const osThreadAttr_t Chassis_attributes = {
   .name = "Chassis",
-  .stack_size = 512 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for Shoot */
 osThreadId_t ShootHandle;
 const osThreadAttr_t Shoot_attributes = {
   .name = "Shoot",
-  .stack_size = 512 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 

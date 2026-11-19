@@ -105,6 +105,7 @@ void FdcanInit(FDCAN_HandleTypeDef *hfdcan, FdcanRxCallback callback)
   g_fdcan_object[index].callback = callback;
   g_fdcan_object[index].fifo_active = 0;
   g_fdcan_object[index].tx_dropped_count = 0;
+  g_fdcan_object[index].bus_off_count = 0;
 
   FdcanFilterConfigAll(hfdcan);
   FdcanGlobalFilterConfig(hfdcan);
@@ -129,7 +130,8 @@ bool FdcanTransmit(FDCAN_HandleTypeDef *hfdcan, uint8_t *tx_data,
                    uint32_t tx_length, uint32_t std_id)
 {
   uint32_t index = FdcanIndex(hfdcan);
-  if (index == 0xFFU || (tx_data == NULL && tx_length > 0U))
+  if (index == 0xFFU || g_fdcan_object[index].hfdcan == NULL ||
+      (tx_data == NULL && tx_length > 0U))
   {
     return false;
   }
@@ -238,7 +240,16 @@ void HAL_FDCAN_ErrorStatusCallback(FDCAN_HandleTypeDef *hfdcan,
 {
   if ((ErrorStatusITs & FDCAN_IT_BUS_OFF) != 0U)
   {
-    (void)HAL_FDCAN_Stop(hfdcan);
-    (void)HAL_FDCAN_Start(hfdcan);
+    FDCAN_ProtocolStatusTypeDef psr = {0};
+    if (HAL_FDCAN_GetProtocolStatus(hfdcan, &psr) == HAL_OK && psr.BusOff != 0U)
+    {
+      uint32_t index = FdcanIndex(hfdcan);
+      if (index != 0xFFU)
+      {
+        g_fdcan_object[index].bus_off_count++;
+      }
+      // 仅在真正进入 Bus-Off 时非阻塞清除 CCCR.INIT，避免退出沿误调用 HAL_FDCAN_Stop 锁死总线
+      CLEAR_BIT(hfdcan->Instance->CCCR, FDCAN_CCCR_INIT);
+    }
   }
 }

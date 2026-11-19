@@ -149,7 +149,8 @@ void MX_GPIO_Init(void)
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+  /* 未使用 DRDY 中断触发 DMA 时保持禁用，避免 3.6 kHz 空转中断 */
+  /* HAL_NVIC_EnableIRQ(EXTI15_10_IRQn); */
 
 }
 

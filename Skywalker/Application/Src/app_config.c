@@ -9,8 +9,9 @@
 
 #include <stddef.h>
 
-#include "usart.h"
+#include "app_protocol.h"
 #include "app_tune_log.h"
+#include "usart.h"
 
 const AppRobotConfig g_app_robot_config = {
     .board_role = kAppBoardSingle,
@@ -20,7 +21,7 @@ const AppRobotConfig g_app_robot_config = {
 };
 
 const AppTaskConfig g_app_task_config = {
-    .manager_period_ms = 1U,
+    .manager_period_ms = 10U,
     .gimbal_period_ms = 1U,
     .chassis_period_ms = 1U,
     .shoot_period_ms = 1U,
@@ -71,4 +72,5 @@ const DebugLogConfig g_app_debug_log_config = {
 void AppConfigInit(void)
 {
   AppTuneLogInit(&g_app_debug_log_config);
+  VisionProtocolInit();
 }

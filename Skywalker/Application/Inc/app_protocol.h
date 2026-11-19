@@ -8,7 +8,10 @@
 #ifndef APP_PROTOCOL_H
 #define APP_PROTOCOL_H
 
+#include <stdbool.h>
 #include <stdint.h>
+
+#include "dev_peripheral.h"
 
 #pragma pack(push, 1)
 
@@ -43,8 +46,11 @@ typedef struct
 
 extern GimbalToVision g_gimbal_to_vision;
 extern VisionToGimbal g_vision_to_gimbal;
+extern PeripheralGuard g_vision_guard;
 
+void VisionProtocolInit(void);
 void VisionProtocolRxCallback(uint8_t *rx_buffer, uint16_t rx_length);
+bool VisionProtocolGetCommand(VisionToGimbal *out);
 void VisionProtocolTransmitGimbalState(void);
 
 #endif // APP_PROTOCOL_H

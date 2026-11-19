@@ -11,6 +11,7 @@
 #include "app_task.h"
 
 #include "app_config.h"
+#include "app_tune_log.h"
 #include "bsp_iwdg.h"
 #include "dev_peripheral.h"
 #include "stm32h7xx_hal.h"
@@ -42,6 +43,7 @@ void ManagerTaskLoop(void)
     PeripheralManagerEmergencyStopAll();
   }
 
+  AppTuneLogFlushIdle();
   BspIwdgFeed();
 }
 

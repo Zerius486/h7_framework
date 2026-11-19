@@ -24,6 +24,7 @@ typedef struct
   uint8_t fifo_active;             // 当前激活的FIFO
   FdcanRxCallback callback;        // 接收回调函数指针
   uint32_t tx_dropped_count;       // 发送失败/丢帧统计
+  uint32_t bus_off_count;          // Bus-Off 进入次数统计
 } FdcanObject;
 
 extern FdcanObject g_fdcan_object[kFdcanNbr];
