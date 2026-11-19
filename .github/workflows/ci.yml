@@ -37,6 +37,12 @@ jobs:
       - name: Build
         run: cmake --build --preset ${{ matrix.preset }} --parallel 2
 
+      - name: Build RMUC variant
+        if: matrix.preset == 'Release'
+        run: |
+          cmake -B build/Release-RMUC -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/gcc-arm-none-eabi.cmake -DCMAKE_BUILD_TYPE=Release -DREFEREE_MODE=RMUC
+          cmake --build build/Release-RMUC --parallel 2
+
       - name: Upload firmware
         uses: actions/upload-artifact@v7
         with:
@@ -69,3 +75,43 @@ jobs:
         run: |
           uv run python tools/tuning/collect.py --help
           uv run python tools/tuning/tune.py --help
+
+  host-tests:
+    name: Host C11 smoke tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run host white-box smoke check (RMUL & RMUC)
+        run: |
+          cat << 'EOF' > /tmp/ci_smoke_test.c
+          #include <assert.h>
+          #include <math.h>
+          #include "alg_imu_ekf.h"
+          #include "alg_motion.h"
+          #include "alg_power.h"
+          #include "app_config.h"
+          #include "app_protocol.h"
+          #include "app_referee.h"
+          #include "dev_dji_dt7.h"
+          #include "dev_dji_motor.h"
+          #include "dev_dm_motor.h"
+          const AppCommunicationConfig g_app_communication_config = {0};
+          int main(void) {
+            HostResetEnv();
+            ImuEkfObject ekf;
+            assert(ImuEkfInit(&ekf, 0.001f, 9.81f) == 0);
+            float g[3] = {0.0f, 0.0f, 0.0f}, a[3] = {0.0f, 0.0f, 9.81f};
+            for (int i = 0; i < 100; ++i) assert(ImuEkfStep(&ekf, g, a) == ARM_MATH_SUCCESS);
+            PowerBudgetConfig pc; PowerBudgetConfigInit(&pc);
+            PowerBudgetController pb; assert(PowerBudgetInit(&pb, &pc));
+            assert(isfinite(PowerBudgetUpdate(&pb, 80.0f, 60.0f, false, 0.0f, false, 0U)));
+            VisionProtocolInit(); Dt7Init();
+            RefereeInit(&g_referee, NULL, NULL);
+            return 0;
+          }
+          EOF
+          .agents/skills/h7-host-test/scripts/run_host_test.sh /tmp/ci_smoke_test.c Skywalker/Application/Src/app_protocol.c
+          .agents/skills/h7-host-test/scripts/run_host_test.sh /tmp/ci_smoke_test.c Skywalker/Application/Src/app_protocol.c -DREFEREE_MODE_RMUC=1
+          rm -f /tmp/ci_smoke_test.c

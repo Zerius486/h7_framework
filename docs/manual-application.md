@@ -31,8 +31,8 @@ Device 使用 BSP 通信，也可组合算法；Application 组织设备和控�
 
 `Core/Src/main.c` 在系统启动时调用 `MPU_Config()` 并同时开启 `I-Cache` 与 `D-Cache`：
 
-- `RAM_D2`（`0x30000000`，`32 KB`）被 MPU 配置为 **Normal Non-Cacheable**（`MPU_TEX_LEVEL1`、`Shareable`），其余区域通过 `MPU_PRIVILEGED_DEFAULT` 保持默认 Cacheable 策略。
-- 链接脚本 `STM32H723XG_FLASH.ld` 将 `.dma_buffer (NOLOAD)` 放置于 `RAM_D2`，`bsp_uart` 与 `bsp_spi` 的 DMA 收发缓冲区置前并按 32 字节对齐。后续新增使用 DMA1/DMA2 的外设缓冲区时，应统一放入 `.dma_buffer` 段（注意 `DMA1/DMA2` 不可访问 `DTCMRAM`）。
+- `RAM_D2`（`0x30000000`，`32 KB`）被 MPU 配置为 **Normal Non-Cacheable**（`MPU_TEX_LEVEL1`、`Shareable`），并在 `Core/Src/system_stm32h7xx.c` 中启用 `DATA_IN_D2_SRAM` 打开 D2 SRAM1/2 时钟；外部 `0x60000000–0x9FFFFFFF` 区域设为 `NO_ACCESS` + `XN` 防止推测访问引发 AXI 总线死锁。
+- 链接脚本 `STM32H723XG_FLASH.ld` 将 `.dma_buffer (NOLOAD)` 放置于 `RAM_D2`，将 `.dtcmram (NOLOAD)` 放置于 0 等待周期的 `DTCMRAM`（`0x20000000`，`128 KB`，如 `g_bmi088`），启动汇编 `startup_stm32h723xx.s` 在进 `main()` 前自动清零这两个段。后续新增使用 DMA1/DMA2 的外设缓冲区时，应统一放入 `.dma_buffer` 段并按 32 字节对齐（注意 `DMA1/DMA2` 不可访问 `DTCMRAM`）。
 
 ### 外设使能与守护
 
@@ -127,7 +127,7 @@ SteerSpeedCorrect(&chassis.state, angle, angle_scale, drive_speed);
 
 在 `app_protocol.h` 定义消息结构和公共接口，在 `app_protocol.c` 实现帧同步、校验、字段解析及发送。
 
-现有视觉协议使用 `AB` 帧头、CRC16 和流缓存；`VisionProtocolRxCallback()` 需要绑定到视觉 UART 接收入口。发送通过 `VisionProtocolTransmitGimbalState()`，串口取自 `g_app_communication_config.vision_huart`。默认业务尚未执行这些绑定或周期发送。
+现有视觉协议使用 `AB` 帧头、CRC16 和流缓存；`AppConfigInit()` 默认调用 `VisionProtocolInit()` 注册视觉 `PeripheralGuard`（非关键外设，`200 ms` 超时离线自动清零 `mode` 防止卡死自动开火）。`VisionProtocolRxCallback()` 需要绑定到视觉 UART 接收入口，业务任务通过 `VisionProtocolGetCommand()` 读取经有效性与原子快照保护的指令。发送通过 `VisionProtocolTransmitGimbalState()`，串口取自 `g_app_communication_config.vision_huart`。默认业务尚未执行这些绑定或周期发送。
 
 可使用 `bsp_stream.h` 处理分包/粘包，使用 `alg_crc.h` 校验。板间消息、调试观测和整定命令均由应用按需求定义。
 

@@ -6,7 +6,7 @@
 
 | 模块 | 用途 | 接口或配置 |
 | --- | --- | --- |
-| `alg_pid` | 并联 PID，支持梯形积分、微分先行、参考差分前馈、条件积分、过零衰减、死区与限幅 | `PidInit/Calculate/Reset`；`PidSetGains` 改参，`PidTrackOutput` 跟踪外部限幅 |
+| `alg_pid` | 并联 PID，支持梯形积分、微分先行、参考差分前馈、条件积分、死区与限幅 | `PidInit/Calculate/Reset`；`PidSetGains` 改参，`PidTrackOutput` 跟踪外部限幅 |
 | `alg_dob` | 一阶 Q 滤波扰动观测器，输出补偿电流 | `DobInit/Update/Reset`；输入实际电流与转子速度 |
 | `alg_td` | 临界阻尼二阶跟踪微分器，输出平滑值与微分估计 | `r`、`dt` |
 | `alg_td_nl` | 含 Fhan 分段函数的非线性跟踪微分器 | `r` 为跟踪加速度上限，滤波时间 $h\geq\Delta t$ |
@@ -70,6 +70,10 @@ IMU EKF 用角速度预测、重力观测修正姿态。当前没有绝对航向
 | `MotorPowerEstimate` | 累加各电机功率 $\max(k_i i^2+K_t\omega i,0)$ |
 | `MotorPowerScale` | 二分求所有电流的统一缩放比例 |
 | `ChassisEstimateVelocity` | 由四轮反馈最小二乘反算车体速度，含奇异性检查与加权陀螺约束，输出残差 |
+| `LeverArmCompensatorInit/Reset/SetArm/Update` | IMU 刚体杆臂效应（切向/向心/科里奥利及相对加速度）补偿至质心 |
+| `ChassisSpeedKfConfigInit/Init/Reset/Update` | 3 状态 $[v,a,b_a]$ 轮速/惯导融合滤波器，支持打滑/腾空高方差降权 |
+| `ChassisSpeedKf2DInit/Reset/Update` | 2D 平面速度估计，显式补偿小陀螺旋转科里奥利耦合 $\pm\omega_z v_{y/x}$ |
+| `alg_power` | 裁判缓冲能量+超电连续预算（`PowerBudget*`）、Active-Set KKT/比例功率分配（`PowerAllocate`）与归一化四参数在线 RLS 辨识（`PowerSysid*`） |
 
 五次轨迹不求解额外的速度、加速度或 jerk 约束；协调器限制规划目标，轮胎附着需由实车评价。
 
