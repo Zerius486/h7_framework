@@ -140,7 +140,6 @@ float PidTuneCalculate(PidTuneObject *tune, PidObject *pid, float reference,
       pid->ki * (pid->error_sum + 0.5f * (error + pid->previous_error) * dt);
   bool integrate = !((potential > pid->output_max && error > 0.0f) ||
                      (potential < -pid->output_max && error < 0.0f));
-  bool crossing = error * pid->previous_error < 0.0f;
   float output = PidCalculate(pid, reference, feedback);
   float output_sensitivity[2];
   float error_sensitivity[2];
@@ -149,10 +148,6 @@ float PidTuneCalculate(PidTuneObject *tune, PidObject *pid, float reference,
   {
     float sensitivity = -tune->velocity_sensitivity[i];
     float integral = tune->integral_sensitivity[i];
-    if (crossing)
-    {
-      integral *= 0.9f;
-    }
     if (integrate)
     {
       integral += 0.5f * (sensitivity + tune->error_sensitivity[i]) * dt;

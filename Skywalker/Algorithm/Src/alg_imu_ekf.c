@@ -25,7 +25,7 @@ static void EkfSetIdentity(float *data, uint16_t size)
 static float EkfSafeCos(float x)
 {
   float c = cosf(x);
-  if (c > 0.0f && c < 1e-4f)
+  if (c >= 0.0f && c < 1e-4f)
   {
     c = 1e-4f;
   }
@@ -34,6 +34,51 @@ static float EkfSafeCos(float x)
     c = -1e-4f;
   }
   return c;
+}
+
+/**
+ * @brief 初始化先验协方差对角线（姿态与陀螺零偏采用物理量级初值）
+ */
+static void EkfInitCovariance(float *p_data)
+{
+  memset(p_data, 0, kEkfImuStateSize * kEkfImuStateSize * sizeof(float));
+  for (uint8_t i = 0U; i < kEkfImuStateSize; ++i)
+  {
+    p_data[(uint32_t)i * kEkfImuStateSize + i] = (i < 3U) ? 0.1f : 1.0e-3f;
+  }
+}
+
+/**
+ * @brief 保持对称性并按同余变换约束协方差上界，严格维持正定性
+ */
+static void EkfNormalizeCovariance(float *p_data)
+{
+  float scale[kEkfImuStateSize];
+  for (uint8_t r = 0U; r < kEkfImuStateSize; ++r)
+  {
+    uint8_t diag_idx = (uint8_t)(r * kEkfImuStateSize + r);
+    if (p_data[diag_idx] < 1.0e-9f)
+    {
+      p_data[diag_idx] = 1.0e-9f;
+    }
+    for (uint8_t c = (uint8_t)(r + 1U); c < kEkfImuStateSize; ++c)
+    {
+      float sym = 0.5f * (p_data[r * kEkfImuStateSize + c] +
+                          p_data[c * kEkfImuStateSize + r]);
+      p_data[r * kEkfImuStateSize + c] = sym;
+      p_data[c * kEkfImuStateSize + r] = sym;
+    }
+    scale[r] = (p_data[diag_idx] > 1.0e3f)
+                   ? sqrtf(1.0e3f / p_data[diag_idx])
+                   : 1.0f;
+  }
+  for (uint8_t r = 0U; r < kEkfImuStateSize; ++r)
+  {
+    for (uint8_t c = 0U; c < kEkfImuStateSize; ++c)
+    {
+      p_data[r * kEkfImuStateSize + c] *= scale[r] * scale[c];
+    }
+  }
 }
 /**
  * @brief 过程模型与状态雅可比
@@ -157,7 +202,7 @@ int8_t ImuEkfInit(ImuEkfObject *ekf, float dt, float gravity)
                    ekf->temp_zz_data);
   arm_mat_init_f32(&ekf->temp_x1, kEkfImuStateSize, 1U, ekf->temp_x1_data);
   EkfSetIdentity(ekf->i_data, kEkfImuStateSize);
-  EkfSetIdentity(ekf->p_data, kEkfImuStateSize);
+  EkfInitCovariance(ekf->p_data);
   memset(ekf->q_data, 0, sizeof(ekf->q_data));
   memset(ekf->r_data, 0, sizeof(ekf->r_data));
   for (i = 0; i < kEkfImuStateSize; i++)
@@ -184,7 +229,7 @@ void ImuEkfReset(ImuEkfObject *ekf)
   }
   memset(ekf->x_data, 0, sizeof(ekf->x_data));
   memset(ekf->x_minus_data, 0, sizeof(ekf->x_minus_data));
-  EkfSetIdentity(ekf->p_data, kEkfImuStateSize);
+  EkfInitCovariance(ekf->p_data);
   memset(ekf->p_minus_data, 0, sizeof(ekf->p_minus_data));
   memset(ekf->corrected_gyro_data, 0, sizeof(ekf->corrected_gyro_data));
 }
@@ -286,6 +331,23 @@ arm_status ImuEkfStep(ImuEkfObject *ekf, const float gyro[kEkfImuInputSize],
   {
     return status;
   }
+  // 强机动/碰撞自适应门控：模长偏离重力过多时抑制加计拉偏与零偏污染
+  float accel_norm = sqrtf(accel[0] * accel[0] + accel[1] * accel[1] +
+                           accel[2] * accel[2]);
+  float norm_err = fabsf(accel_norm - ekf->gravity);
+  if (norm_err > 0.5f * ekf->gravity)
+  {
+    memcpy(ekf->x_data, ekf->x_minus_data, sizeof(ekf->x_data));
+    memcpy(ekf->p_data, ekf->p_minus_data, sizeof(ekf->p_data));
+    EkfNormalizeCovariance(ekf->p_data);
+    ekf->corrected_gyro_data[0] = gyro[0] - ekf->x_data[3];
+    ekf->corrected_gyro_data[1] = gyro[1] - ekf->x_data[4];
+    ekf->corrected_gyro_data[2] = gyro[2] - ekf->x_data[5];
+    return ARM_MATH_SUCCESS;
+  }
+  float norm_ratio = norm_err / (0.15f * ekf->gravity);
+  float r_scale = 1.0f + 10.0f * norm_ratio * norm_ratio;
+
   EkfMeasurementModelAndJacobian(ekf);
   for (i = 0; i < kEkfImuMeasSize; i++)
   {
@@ -306,10 +368,9 @@ arm_status ImuEkfStep(ImuEkfObject *ekf, const float gyro[kEkfImuInputSize],
   {
     return status;
   }
-  status = arm_mat_add_f32(&ekf->s, &ekf->r, &ekf->s);
-  if (status != ARM_MATH_SUCCESS)
+  for (i = 0; i < kEkfImuMeasSize * kEkfImuMeasSize; i++)
   {
-    return status;
+    ekf->s_data[i] += r_scale * ekf->r_data[i];
   }
   status = arm_mat_inverse_f32(&ekf->s, &ekf->temp_zz);
   if (status != ARM_MATH_SUCCESS)
@@ -344,6 +405,8 @@ arm_status ImuEkfStep(ImuEkfObject *ekf, const float gyro[kEkfImuInputSize],
   ekf->x_data[0] = MathWrapPi(ekf->x_data[0]);
   ekf->x_data[1] = MathWrapPi(ekf->x_data[1]);
   ekf->x_data[2] = MathWrapPi(ekf->x_data[2]);
+
+  // Joseph 形式协方差更新：P = (I - K H) P^- (I - K H)^T + K (r_scale * R) K^T
   status = arm_mat_mult_f32(&ekf->k, &ekf->h, &ekf->temp_xx_1);
   if (status != ARM_MATH_SUCCESS)
   {
@@ -354,29 +417,45 @@ arm_status ImuEkfStep(ImuEkfObject *ekf, const float gyro[kEkfImuInputSize],
   {
     return status;
   }
-  status = arm_mat_mult_f32(&ekf->temp_xx_2, &ekf->p_minus, &ekf->p);
+  status = arm_mat_mult_f32(&ekf->temp_xx_2, &ekf->p_minus, &ekf->temp_xx_1);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  status = arm_mat_trans_f32(&ekf->temp_xx_2, &ekf->f_t);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  status = arm_mat_mult_f32(&ekf->temp_xx_1, &ekf->f_t, &ekf->p);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  status = arm_mat_mult_f32(&ekf->k, &ekf->r, &ekf->temp_xz);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  for (i = 0; i < kEkfImuStateSize * kEkfImuMeasSize; i++)
+  {
+    ekf->temp_xz_data[i] *= r_scale;
+  }
+  status = arm_mat_trans_f32(&ekf->k, &ekf->temp_zx);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  status = arm_mat_mult_f32(&ekf->temp_xz, &ekf->temp_zx, &ekf->temp_xx_1);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  status = arm_mat_add_f32(&ekf->p, &ekf->temp_xx_1, &ekf->temp_xx_2);
   if (status == ARM_MATH_SUCCESS)
   {
-    // 对称化协方差阵并限制不可观测方向（如 yaw / bz）协方差无界增长
-    for (uint8_t r = 0U; r < kEkfImuStateSize; ++r)
-    {
-      uint8_t diag_idx = (uint8_t)(r * kEkfImuStateSize + r);
-      if (ekf->p_data[diag_idx] > 1.0e4f)
-      {
-        ekf->p_data[diag_idx] = 1.0e4f;
-      }
-      else if (ekf->p_data[diag_idx] < 1.0e-9f)
-      {
-        ekf->p_data[diag_idx] = 1.0e-9f;
-      }
-      for (uint8_t c = (uint8_t)(r + 1U); c < kEkfImuStateSize; ++c)
-      {
-        float sym = 0.5f * (ekf->p_data[r * kEkfImuStateSize + c] +
-                            ekf->p_data[c * kEkfImuStateSize + r]);
-        ekf->p_data[r * kEkfImuStateSize + c] = sym;
-        ekf->p_data[c * kEkfImuStateSize + r] = sym;
-      }
-    }
+    memcpy(ekf->p_data, ekf->temp_xx_2_data, sizeof(ekf->p_data));
+    EkfNormalizeCovariance(ekf->p_data);
     ekf->corrected_gyro_data[0] = gyro[0] - ekf->x_data[3];
     ekf->corrected_gyro_data[1] = gyro[1] - ekf->x_data[4];
     ekf->corrected_gyro_data[2] = gyro[2] - ekf->x_data[5];

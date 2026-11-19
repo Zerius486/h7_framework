@@ -20,6 +20,10 @@
  */
 static inline float MathClamp(float value, float lower, float upper)
 {
+  if (isnan(value))
+  {
+    return fminf(fmaxf(0.0f, lower), upper);
+  }
   return fminf(fmaxf(value, lower), upper);
 }
 
@@ -63,7 +67,29 @@ static inline float MathSign(float value)
  */
 static inline float MathWrapPi(float angle)
 {
-  return remainderf(angle, 2.0f * (float)M_PI);
+  if (!isfinite(angle))
+  {
+    return 0.0f;
+  }
+  const float kPi = 3.14159265358979323846f;
+  const float kTwoPi = 6.28318530717958647692f;
+  if (angle > kPi)
+  {
+    if (angle <= kPi + kTwoPi)
+    {
+      return angle - kTwoPi;
+    }
+    return remainderf(angle, kTwoPi);
+  }
+  if (angle < -kPi)
+  {
+    if (angle >= -kPi - kTwoPi)
+    {
+      return angle + kTwoPi;
+    }
+    return remainderf(angle, kTwoPi);
+  }
+  return angle;
 }
 
 /**
@@ -89,7 +115,7 @@ static inline float MathWrap2Pi(float angle)
  */
 static inline float MathAngleDiff(float target, float current)
 {
-  return remainderf(target - current, 2.0f * (float)M_PI);
+  return MathWrapPi(target - current);
 }
 
 /* 常用物理量与编码器转换接口 ------------------------------------------------*/

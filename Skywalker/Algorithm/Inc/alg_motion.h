@@ -105,6 +105,20 @@ void LeverArmCompensatorSetArm(LeverArmCompensator *comp,
 void LeverArmCompensatorUpdate(LeverArmCompensator *comp,
                                  const float accel_imu[3], const float omega[3],
                                  float dt, float accel_com[3]);
+// 2D平面底盘速度卡尔曼滤波器（含小陀螺科里奥利耦合补偿）
+typedef struct
+{
+  ChassisSpeedKf kf_x;
+  ChassisSpeedKf kf_y;
+  float vx;         // 估计车体系前向速度（m/s）
+  float vy;         // 估计车体系横向速度（m/s）
+  float ax;         // 估计车体系前向加速度（m/s²）
+  float ay;         // 估计车体系横向加速度（m/s²）
+  float px;         // 积分前向位移（m）
+  float py;         // 积分横向位移（m）
+  bool initialized; // 初始化标志
+} ChassisSpeedKf2D;
+
 void ChassisSpeedKfConfigInit(ChassisSpeedKfConfig *config,
                               float sampling_time);
 bool ChassisSpeedKfInit(ChassisSpeedKf *speed_kf,
@@ -112,5 +126,11 @@ bool ChassisSpeedKfInit(ChassisSpeedKf *speed_kf,
 void ChassisSpeedKfReset(ChassisSpeedKf *speed_kf);
 float ChassisSpeedKfUpdate(ChassisSpeedKf *speed_kf, float wheel_velocity,
                            float accel_imu, bool wheel_valid);
+bool ChassisSpeedKf2DInit(ChassisSpeedKf2D *kf2d,
+                          const ChassisSpeedKfConfig *config);
+void ChassisSpeedKf2DReset(ChassisSpeedKf2D *kf2d);
+void ChassisSpeedKf2DUpdate(ChassisSpeedKf2D *kf2d, float wheel_vx,
+                            float wheel_vy, float accel_imu_x,
+                            float accel_imu_y, float omega_z, bool wheel_valid);
 
 #endif // ALG_MOTION_H

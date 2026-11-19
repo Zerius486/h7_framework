@@ -210,15 +210,21 @@ void SteerSetpointUpdate(SteerSetpoint *setpoint, Chassis *chassis,
   if (!SteerCandidate(setpoint, chassis, fraction, speed_step, angle_step,
                       switch_hysteresis, &candidate))
   {
+    Chassis desired = candidate;
+    Chassis best_candidate;
+    Chassis trial;
+    bool has_best = false;
     float low = 0.0f;
     float high = 1.0f;
-    for (int i = 0; i < 16; i++)
+    for (int i = 0; i < 8; i++)
     {
       float mid = (low + high) / 2.0f;
       if (SteerCandidate(setpoint, chassis, mid, speed_step, angle_step,
-                         switch_hysteresis, &candidate))
+                         switch_hysteresis, &trial))
       {
         low = mid;
+        best_candidate = trial;
+        has_best = true;
       }
       else
       {
@@ -226,37 +232,42 @@ void SteerSetpointUpdate(SteerSetpoint *setpoint, Chassis *chassis,
       }
     }
     fraction = low;
-    SteerCandidate(setpoint, chassis, fraction, speed_step, angle_step,
-                   switch_hysteresis, &candidate);
-  }
-  if (fraction < 1e-4f)
-  {
-    // 插值受阻时，仅预转向尚未对准的近零速轮。
-    Chassis desired;
-    SteerCandidate(setpoint, chassis, 1.0f, speed_step, angle_step,
-                   switch_hysteresis, &desired);
-    bool is_presteering = false;
-    for (int i = 0; i < 4; i++)
+    if (has_best)
     {
-      if (fabsf(setpoint->wheels.wheel_speed[i]) > kSteerWheelSpeedEpsilon)
+      candidate = best_candidate;
+    }
+    else
+    {
+      SteerCandidate(setpoint, chassis, 0.0f, speed_step, angle_step,
+                     switch_hysteresis, &candidate);
+    }
+
+    if (fraction < 1e-4f)
+    {
+      // 插值受阻时，仅预转向尚未对准的近零速轮。
+      bool is_presteering = false;
+      for (int i = 0; i < 4; i++)
       {
-        continue;
+        if (fabsf(setpoint->wheels.wheel_speed[i]) > kSteerWheelSpeedEpsilon)
+        {
+          continue;
+        }
+        float delta = MathAngleDiff(desired.state.wheel_angle[i],
+                                    setpoint->wheels.wheel_angle[i]);
+        if (fabsf(delta) <= angle_step + 1e-6f)
+        {
+          continue;
+        }
+        if (!is_presteering)
+        {
+          candidate.velocity = setpoint->velocity;
+          candidate.state = setpoint->wheels;
+          is_presteering = true;
+        }
+        candidate.state.wheel_angle[i] =
+            MathWrapPi(setpoint->wheels.wheel_angle[i] +
+                       MathClamp(delta, -angle_step, angle_step));
       }
-      float delta = MathAngleDiff(desired.state.wheel_angle[i],
-                                  setpoint->wheels.wheel_angle[i]);
-      if (fabsf(delta) <= angle_step + 1e-6f)
-      {
-        continue;
-      }
-      if (!is_presteering)
-      {
-        candidate.velocity = setpoint->velocity;
-        candidate.state = setpoint->wheels;
-        is_presteering = true;
-      }
-      candidate.state.wheel_angle[i] =
-          MathWrapPi(setpoint->wheels.wheel_angle[i] +
-                     MathClamp(delta, -angle_step, angle_step));
     }
   }
   setpoint->velocity = candidate.velocity;
@@ -372,6 +383,15 @@ bool ChassisEstimateVelocity(const Chassis *chassis, const float speed[4],
        chassis->type != kOmniWheel))
   {
     return false;
+  }
+
+  for (int i = 0; i < 4; i++)
+  {
+    if (!isfinite(speed[i]) ||
+        (chassis->type == kSteerWheel && !isfinite(angle[i])))
+    {
+      return false;
+    }
   }
 
   float matrix[3][4] = {0};
@@ -655,10 +675,10 @@ void ChassisSpeedKfConfigInit(ChassisSpeedKfConfig *config, float sampling_time)
     return;
   }
   config->sampling_time = sampling_time;
-  config->accel_q = 3000.0f;
-  config->bias_q = 0.1f;
-  config->vel_r = 10.0f;
-  config->acc_r = 3.0f;
+  config->accel_q = 2000.0f;
+  config->bias_q = 0.05f;
+  config->vel_r = 1.0f;
+  config->acc_r = 2.0f;
 }
 
 static void ChassisSpeedKfApplyMatrices(ChassisSpeedKf *speed_kf)
@@ -768,6 +788,8 @@ float ChassisSpeedKfUpdate(ChassisSpeedKf *speed_kf, float wheel_velocity,
     return (speed_kf != NULL) ? speed_kf->velocity : 0.0f;
   }
 
+  // 腾空/打滑时极大放大轮速观测方差 R[0]，让速度协方差自由增长并在落地后快速重收敛
+  speed_kf->kf.r_data[0] = wheel_valid ? speed_kf->config.vel_r : 1.0e6f;
   float z_vel = wheel_valid
                     ? wheel_velocity
                     : (speed_kf->velocity +
@@ -781,4 +803,79 @@ float ChassisSpeedKfUpdate(ChassisSpeedKf *speed_kf, float wheel_velocity,
     speed_kf->position += speed_kf->velocity * speed_kf->config.sampling_time;
   }
   return speed_kf->velocity;
+}
+
+/**
+ * @brief 初始化2D平面底盘速度卡尔曼滤波器
+ * @param kf2d 2D滤波器对象指针
+ * @param config 单轴滤波器配置指针（XY共用相同噪声参数）
+ * @return true表示初始化成功
+ */
+bool ChassisSpeedKf2DInit(ChassisSpeedKf2D *kf2d,
+                          const ChassisSpeedKfConfig *config)
+{
+  if (kf2d == NULL || config == NULL)
+  {
+    return false;
+  }
+  memset(kf2d, 0, sizeof(*kf2d));
+  if (!ChassisSpeedKfInit(&kf2d->kf_x, config) ||
+      !ChassisSpeedKfInit(&kf2d->kf_y, config))
+  {
+    return false;
+  }
+  kf2d->initialized = true;
+  return true;
+}
+
+/**
+ * @brief 复位2D平面底盘速度卡尔曼滤波器
+ * @param kf2d 2D滤波器对象指针
+ */
+void ChassisSpeedKf2DReset(ChassisSpeedKf2D *kf2d)
+{
+  if (kf2d == NULL || !kf2d->initialized)
+  {
+    return;
+  }
+  ChassisSpeedKfReset(&kf2d->kf_x);
+  ChassisSpeedKfReset(&kf2d->kf_y);
+  kf2d->vx = 0.0f;
+  kf2d->vy = 0.0f;
+  kf2d->ax = 0.0f;
+  kf2d->ay = 0.0f;
+  kf2d->px = 0.0f;
+  kf2d->py = 0.0f;
+}
+
+/**
+ * @brief 单步更新2D底盘速度滤波器（含小陀螺旋转科里奥利耦合补偿）
+ * @param kf2d 2D滤波器对象指针
+ * @param wheel_vx 轮速计前向速度（m/s）
+ * @param wheel_vy 轮速计横向速度（m/s）
+ * @param accel_imu_x 机体系前向净加速度（m/s²）
+ * @param accel_imu_y 机体系横向净加速度（m/s²）
+ * @param omega_z 车体Z轴角速度（rad/s，逆时针为正）
+ * @param wheel_valid 轮速观测是否可信
+ */
+void ChassisSpeedKf2DUpdate(ChassisSpeedKf2D *kf2d, float wheel_vx,
+                            float wheel_vy, float accel_imu_x,
+                            float accel_imu_y, float omega_z, bool wheel_valid)
+{
+  if (kf2d == NULL || !kf2d->initialized || !isfinite(accel_imu_x) ||
+      !isfinite(accel_imu_y) || !isfinite(omega_z) ||
+      (wheel_valid && (!isfinite(wheel_vx) || !isfinite(wheel_vy))))
+  {
+    return;
+  }
+
+  // 刚体平面运动学：a_imu_x = dv_x/dt - omega_z * v_y, a_imu_y = dv_y/dt + omega_z * v_x
+  float ax_kin = accel_imu_x + omega_z * kf2d->vy;
+  float ay_kin = accel_imu_y - omega_z * kf2d->vx;
+  kf2d->vx = ChassisSpeedKfUpdate(&kf2d->kf_x, wheel_vx, ax_kin, wheel_valid);
+  kf2d->vy = ChassisSpeedKfUpdate(&kf2d->kf_y, wheel_vy, ay_kin, wheel_valid);
+  kf2d->ax = kf2d->kf_x.acceleration;
+  kf2d->ay = kf2d->kf_y.acceleration;
+  kf2d->px = kf2d->kf_x.position;
+  kf2d->py = kf2d->kf_y.position;
 }
