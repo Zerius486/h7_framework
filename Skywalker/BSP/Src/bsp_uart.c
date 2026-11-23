@@ -44,34 +44,58 @@ uint8_t UartIndex(UART_HandleTypeDef *huart)
   return 0xFF;
 }
 
-static void UartDisableHalfTransferIt(UART_HandleTypeDef *huart)
+/**
+ * @brief 判断是否为RS485电机总线串口（USART2/USART3）
+ * @param huart UART句柄
+ * @return true 为RS485串口; false 非RS485串口
+ */
+bool UartIsRs485(UART_HandleTypeDef *huart)
 {
-  if (huart != NULL && huart->hdmarx != NULL)
+  return huart == &huart2 || huart == &huart3;
+}
+
+/**
+ * @brief 动态配置UART波特率（非RS485串口适用）
+ * @param huart UART句柄
+ * @param baudrate 目标波特率（bps）
+ * @return true 配置成功; false 参数无效或HAL初始化失败
+ */
+bool UartSetBaudrate(UART_HandleTypeDef *huart, uint32_t baudrate)
+{
+  if (huart == NULL || baudrate == 0U || UartIndex(huart) == 0xFFU)
   {
-    __HAL_DMA_DISABLE_IT(huart->hdmarx, DMA_IT_HT);
+    return false;
   }
+  if (huart->Init.BaudRate == baudrate)
+  {
+    return true;
+  }
+
+  (void)HAL_UART_Abort(huart);
+  huart->Init.BaudRate = baudrate;
+  return HAL_UART_Init(huart) == HAL_OK;
 }
 
 static void UartStartRxDma(uint32_t index)
 {
   UART_HandleTypeDef *huart = g_uart_object[index].huart;
-  if (huart == NULL || g_uart_object[index].rx_buffer_active == NULL)
+  if (huart == NULL)
   {
     return;
   }
 
+  g_uart_object[index].rx_old_pos = 0U;
   __HAL_UART_CLEAR_FLAG(huart, UART_CLEAR_OREF | UART_CLEAR_FEF |
                                    UART_CLEAR_NEF | UART_CLEAR_PEF);
-  if (HAL_UARTEx_ReceiveToIdle_DMA(huart, g_uart_object[index].rx_buffer_active,
+  if (HAL_UARTEx_ReceiveToIdle_DMA(huart, g_uart_object[index].rx_buffer,
                                    kUartBufferSize) != HAL_OK)
   {
     (void)HAL_UART_AbortReceive(huart);
     __HAL_UART_CLEAR_FLAG(huart, UART_CLEAR_OREF | UART_CLEAR_FEF |
                                      UART_CLEAR_NEF | UART_CLEAR_PEF);
     (void)HAL_UARTEx_ReceiveToIdle_DMA(
-        huart, g_uart_object[index].rx_buffer_active, kUartBufferSize);
+        huart, g_uart_object[index].rx_buffer, kUartBufferSize);
   }
-  UartDisableHalfTransferIt(huart);
 }
 
 /**
@@ -90,8 +114,6 @@ void UartInit(UART_HandleTypeDef *huart, UartRxCallback callback)
   memset(&g_uart_object[index], 0, sizeof(g_uart_object[index]));
   g_uart_object[index].huart = huart;
   g_uart_object[index].callback = callback;
-  g_uart_object[index].rx_buffer_active = g_uart_object[index].rx_buffer_0;
-  g_uart_object[index].rx_buffer_ready = NULL;
   UartStartRxDma(index);
 }
 
@@ -158,41 +180,49 @@ bool UartTransmitReady(UART_HandleTypeDef *huart)
 }
 
 /**
- * @brief HAL库 UART接收事件回调函数
+ * @brief HAL库 UART接收事件回调函数（Circular DMA环形增量读取）
  * @param huart UART句柄
- * @param rx_length 接收长度
+ * @param rx_pos 当前DMA写入游标（0..kUartBufferSize）
  */
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t rx_length)
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t rx_pos)
 {
   uint32_t index = UartIndex(huart);
-  if (index == 0xFFU)
+  if (index == 0xFFU || rx_pos > kUartBufferSize)
   {
     return;
   }
 
-  if (HAL_UARTEx_GetRxEventType(huart) == HAL_UART_RXEVENT_HT)
+  uint16_t old_pos = g_uart_object[index].rx_old_pos;
+  if (rx_pos == old_pos)
   {
     return;
   }
 
-  if (rx_length == 0U || rx_length > kUartBufferSize)
+  UartRxCallback callback = g_uart_object[index].callback;
+  uint8_t *rx_buf = g_uart_object[index].rx_buffer;
+
+  if (rx_pos > old_pos)
   {
-    UartStartRxDma(index);
-    return;
+    uint16_t len = rx_pos - old_pos;
+    g_uart_object[index].rx_old_pos =
+        (rx_pos == kUartBufferSize) ? 0U : rx_pos;
+    if (callback != NULL)
+    {
+      callback(&rx_buf[old_pos], len);
+    }
   }
-
-  g_uart_object[index].rx_buffer_ready = g_uart_object[index].rx_buffer_active;
-  g_uart_object[index].rx_buffer_active =
-      (g_uart_object[index].rx_buffer_active ==
-       g_uart_object[index].rx_buffer_0)
-          ? g_uart_object[index].rx_buffer_1
-          : g_uart_object[index].rx_buffer_0;
-  UartStartRxDma(index);
-
-  if (g_uart_object[index].callback != NULL)
+  else
   {
-    g_uart_object[index].callback(g_uart_object[index].rx_buffer_ready,
-                                  rx_length);
+    uint16_t tail_len = kUartBufferSize - old_pos;
+    g_uart_object[index].rx_old_pos = rx_pos;
+    if (callback != NULL)
+    {
+      callback(&rx_buf[old_pos], tail_len);
+      if (rx_pos > 0U)
+      {
+        callback(&rx_buf[0], rx_pos);
+      }
+    }
   }
 }
 
@@ -203,8 +233,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t rx_length)
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
   uint32_t index = UartIndex(huart);
-  if (index == 0xFFU || g_uart_object[index].huart == NULL ||
-      g_uart_object[index].rx_buffer_active == NULL)
+  if (index == 0xFFU || g_uart_object[index].huart == NULL)
   {
     return;
   }
