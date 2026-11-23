@@ -296,6 +296,7 @@ arm_status KfUpdate(KfObject *kf, const float *z_measurement)
   {
     return status;
   }
+  // Joseph 协方差更新: P = (I - K*H) * P^- * (I - K*H)^T + K * R * K^T
   status = arm_mat_mult_f32(&kf->k, &kf->h, &kf->temp_xx_1);
   if (status != ARM_MATH_SUCCESS)
   {
@@ -306,12 +307,47 @@ arm_status KfUpdate(KfObject *kf, const float *z_measurement)
   {
     return status;
   }
-  status = arm_mat_mult_f32(&kf->temp_xx_2, &kf->p_minus, &kf->p);
+  status = arm_mat_mult_f32(&kf->temp_xx_2, &kf->p_minus, &kf->temp_xx_1);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  status = arm_mat_trans_f32(&kf->temp_xx_2, &kf->f_t);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  status = arm_mat_mult_f32(&kf->temp_xx_1, &kf->f_t, &kf->p);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  status = arm_mat_mult_f32(&kf->k, &kf->r, &kf->temp_xz);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  status = arm_mat_trans_f32(&kf->k, &kf->temp_zx);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  status = arm_mat_mult_f32(&kf->temp_xz, &kf->temp_zx, &kf->temp_xx_1);
+  if (status != ARM_MATH_SUCCESS)
+  {
+    return status;
+  }
+  status = arm_mat_add_f32(&kf->p, &kf->temp_xx_1, &kf->temp_xx_2);
   if (status == ARM_MATH_SUCCESS)
   {
     uint16_t n = kf->xhat_size;
+    memcpy(kf->p_data, kf->temp_xx_2_data, (size_t)n * (size_t)n * sizeof(float));
     for (uint16_t r = 0U; r < n; ++r)
     {
+      if (!(kf->p_data[r * n + r] > 1e-9f))
+      {
+        kf->p_data[r * n + r] = 1e-9f;
+      }
       for (uint16_t c = r + 1U; c < n; ++c)
       {
         float sym = 0.5f * (kf->p_data[r * n + c] + kf->p_data[c * n + r]);
