@@ -293,10 +293,22 @@ bool PeripheralManagerIsAllCriticalOnline(void);
 bool PeripheralManagerHasCriticalFault(void);
 
 /**
- * @brief 全局一键安全急停所有已登记外设
- * @note 强制所有处于使能态的外设调用 Disable 退回待命态并下发零电流
+ * @brief 全局一键安全急停所有已登记外设并锁存急停状态
+ * @note 强制所有处于使能态的外设调用 Disable 退回待命态并下发零电流，
+ *       在调用 PeripheralManagerClearEmergencyStop() 解锁前禁止任何外设重新使能
  */
 void PeripheralManagerEmergencyStopAll(void);
+
+/**
+ * @brief 解除全局安全急停锁存状态
+ */
+void PeripheralManagerClearEmergencyStop(void);
+
+/**
+ * @brief 查询当前是否处于全局安全急停锁存状态
+ * @return true 处于急停锁存态; false 正常态
+ */
+bool PeripheralManagerIsEmergencyStopped(void);
 
 /**
  * @brief 获取发生离线或故障的外设总数

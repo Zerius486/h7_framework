@@ -27,7 +27,10 @@ static void DjiMotorGuardDisableHook(void *device_ptr)
   motor->state.is_enabled = false;
   motor->state.given_current = 0.0f;
   PidReset(&motor->state.speed_loop);
-  PidReset(&motor->state.position_loop);
+  if (motor->type == kDjiMotorGm6020)
+  {
+    PidReset(&motor->state.position_loop);
+  }
 }
 
 static void DjiMotorGuardResyncHook(void *device_ptr)
@@ -37,12 +40,16 @@ static void DjiMotorGuardResyncHook(void *device_ptr)
   {
     return;
   }
-  // 离线恢复后防暴冲重同步：重置连续角度展开基准，复位积分器并保持失能待命
+  // 离线恢复后防暴冲重同步：复位积分器并保持失能待命，GM6020重置连续角度基准
   motor->state.is_enabled = false;
-  motor->state.is_angle_initialized = false;
   motor->state.given_current = 0.0f;
   PidReset(&motor->state.speed_loop);
-  PidReset(&motor->state.position_loop);
+  if (motor->type == kDjiMotorGm6020)
+  {
+    motor->state.is_angle_initialized = false;
+    motor->state.total_round = 0;
+    PidReset(&motor->state.position_loop);
+  }
 }
 
 static float DjiMotorCurrentLimitA(DjiMotorType type)
@@ -155,14 +162,19 @@ void DjiMotorInit(DjiMotor *motor, DjiMotorType type, DjiMotorMode mode,
 
   memset(motor, 0, sizeof(*motor));
   PidInit(&motor->state.speed_loop, speed_pid_config);
-  if (position_pid_config != NULL)
-  {
-    PidInit(&motor->state.position_loop, position_pid_config);
-  }
 
   motor->state.is_enabled = false;
   motor->type = type;
-  motor->mode = mode;
+  if (type == kDjiMotorGm6020 && mode == kDjiMotorModePosition &&
+      position_pid_config != NULL)
+  {
+    PidInit(&motor->state.position_loop, position_pid_config);
+    motor->mode = kDjiMotorModePosition;
+  }
+  else
+  {
+    motor->mode = kDjiMotorModeSpeed;
+  }
 
   PeripheralOps ops = {
       .on_enable = DjiMotorGuardEnableHook,
@@ -225,17 +237,31 @@ void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data)
   // 先刷新外设心跳喂狗，若刚从离线态恢复则先触发 on_resync 重置连续角展开基准
   PeripheralGuardFeed(&motor->guard, HAL_GetTick());
 
-  if (!motor->state.is_angle_initialized)
+  if (motor->type == kDjiMotorGm6020)
   {
-    motor->state.continuous_angle = motor->state.angle;
-    motor->state.last_angle = motor->state.angle;
-    motor->state.is_angle_initialized = true;
-  }
-  else
-  {
-    motor->state.continuous_angle +=
-        MathWrapPi(motor->state.angle - motor->state.last_angle);
-    motor->state.last_angle = motor->state.angle;
+    if (!motor->state.is_angle_initialized)
+    {
+      motor->state.total_round = 0;
+      motor->state.last_angle = motor->state.angle;
+      motor->state.continuous_angle = motor->state.angle;
+      motor->state.is_angle_initialized = true;
+    }
+    else
+    {
+      float delta = motor->state.angle - motor->state.last_angle;
+      if (delta > (float)M_PI)
+      {
+        motor->state.total_round--;
+      }
+      else if (delta < -(float)M_PI)
+      {
+        motor->state.total_round++;
+      }
+      motor->state.last_angle = motor->state.angle;
+      motor->state.continuous_angle =
+          (float)((double)motor->state.total_round * (2.0 * (double)M_PI) +
+                  (double)motor->state.angle);
+    }
   }
   motor->state.current =
       DjiMotorCurrentUnitsToAmperes(motor->type, current_units);
@@ -256,8 +282,10 @@ void DjiMotorCurrentCalculate(DjiMotor *motor)
   {
     return;
   }
-  DjiMotorCurrentCalculateWithFeedback(
-      motor, motor->state.continuous_angle, motor->state.omega);
+  float position_feedback =
+      (motor->type == kDjiMotorGm6020) ? motor->state.continuous_angle : 0.0f;
+  DjiMotorCurrentCalculateWithFeedback(motor, position_feedback,
+                                       motor->state.omega);
 }
 
 /**
@@ -290,12 +318,13 @@ void DjiMotorCurrentCalculateWithFeedback(DjiMotor *motor,
   }
   case kDjiMotorModePosition:
   {
-    float position_reference = motor->state.given_angle;
-    if (motor->type == kDjiMotorGm6020)
+    if (motor->type != kDjiMotorGm6020)
     {
-      position_reference = DjiMotorPositionReference(
-          motor, position_feedback, omega_feedback);
+      motor->state.given_current = 0.0f;
+      break;
     }
+    float position_reference = DjiMotorPositionReference(
+        motor, position_feedback, omega_feedback);
 
     motor->state.given_omega = PidCalculate(
         &motor->state.position_loop, position_reference,

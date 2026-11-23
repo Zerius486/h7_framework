@@ -10,6 +10,16 @@
 
 #include "stm32h7xx_hal.h"
 
+typedef struct {
+  PeripheralGuard *guards[kPeripheralMaxRegisteredCount];
+  bool is_critical[kPeripheralMaxRegisteredCount];
+  uint32_t count;
+  bool initialized;
+  bool emergency_stop_latched;
+} PeripheralRegistry;
+
+static PeripheralRegistry g_peripheral_registry = {0};
+
 static inline uint32_t PeripheralEnterCritical(void) {
   uint32_t primask = __get_PRIMASK();
   __disable_irq();
@@ -235,10 +245,11 @@ bool PeripheralGuardEnable(PeripheralGuard *guard) {
 
   uint32_t primask = PeripheralEnterCritical();
   bool can_enable =
-      (guard->state == kPeripheralStateDisabled && guard->error_code == 0U);
+      (guard->state == kPeripheralStateDisabled && guard->error_code == 0U &&
+       !g_peripheral_registry.emergency_stop_latched);
   PeripheralExitCritical(primask);
 
-  // 仅在安全待命态且无故障时允许切入使能态
+  // 仅在安全待命态、无故障且未触发全局急停锁存时允许切入使能态
   if (!can_enable) {
     return false;
   }
@@ -253,7 +264,8 @@ bool PeripheralGuardEnable(PeripheralGuard *guard) {
   uint32_t now_tick = HAL_GetTick();
   primask = PeripheralEnterCritical();
   bool still_valid =
-      (guard->state == kPeripheralStateDisabled && guard->error_code == 0U);
+      (guard->state == kPeripheralStateDisabled && guard->error_code == 0U &&
+       !g_peripheral_registry.emergency_stop_latched);
   if (still_valid) {
     guard->last_state = guard->state;
     guard->state = kPeripheralStateEnabled;
@@ -372,15 +384,6 @@ const char *PeripheralGetStateName(PeripheralState state) {
 /* 全局外设集中管理器 (PeripheralManager) 实现                                */
 /* ========================================================================= */
 
-typedef struct {
-  PeripheralGuard *guards[kPeripheralMaxRegisteredCount];
-  bool is_critical[kPeripheralMaxRegisteredCount];
-  uint32_t count;
-  bool initialized;
-} PeripheralRegistry;
-
-static PeripheralRegistry g_peripheral_registry = {0};
-
 void PeripheralManagerInit(void) {
   uint32_t primask = PeripheralEnterCritical();
   g_peripheral_registry.initialized = true;
@@ -457,12 +460,29 @@ bool PeripheralManagerHasCriticalFault(void) {
 }
 
 void PeripheralManagerEmergencyStopAll(void) {
+  uint32_t primask = PeripheralEnterCritical();
+  g_peripheral_registry.emergency_stop_latched = true;
+  PeripheralExitCritical(primask);
+
   for (uint32_t i = 0; i < g_peripheral_registry.count; ++i) {
     PeripheralGuard *g = g_peripheral_registry.guards[i];
     if (g != NULL && g->state == kPeripheralStateEnabled) {
       PeripheralGuardDisable(g);
     }
   }
+}
+
+void PeripheralManagerClearEmergencyStop(void) {
+  uint32_t primask = PeripheralEnterCritical();
+  g_peripheral_registry.emergency_stop_latched = false;
+  PeripheralExitCritical(primask);
+}
+
+bool PeripheralManagerIsEmergencyStopped(void) {
+  uint32_t primask = PeripheralEnterCritical();
+  bool latched = g_peripheral_registry.emergency_stop_latched;
+  PeripheralExitCritical(primask);
+  return latched;
 }
 
 uint32_t PeripheralManagerGetAbnormalCount(void) {

@@ -26,18 +26,19 @@ typedef struct
 {
   bool is_enabled;           // 电机使能标志
   uint32_t id;               // 电机ID
-  float angle;               // 当前角度（rad）
-  float continuous_angle;    // 当前连续角度（rad）
-  float last_angle;          // 上一次单圈角度（rad）
-  bool is_angle_initialized; // 连续角度初始化标志
-  float given_angle;         // 目标角度（rad）
+  float angle;               // 当前单圈角度（rad）
+  int32_t total_round;       // GM6020多圈计数
+  float continuous_angle;    // GM6020当前连续角度（rad）
+  float last_angle;          // GM6020上一次单圈角度（rad）
+  bool is_angle_initialized; // GM6020连续角度初始化标志
+  float given_angle;         // GM6020目标角度（rad）
   float omega;               // 当前角速度（rad/s）
   float given_omega;         // 目标角速度（rad/s）
   float current;             // 当前电流（A）
   float given_current;       // 目标电流（A）
   float temperature;         // 温度（℃）
   PidObject speed_loop;      // 速度环PID控制器
-  PidObject position_loop;   // 位置环PID控制器
+  PidObject position_loop;   // GM6020位置环PID控制器
 } DjiMotorState;
 
 // DJI电机类型枚举

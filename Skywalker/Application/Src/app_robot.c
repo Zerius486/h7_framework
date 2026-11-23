@@ -36,11 +36,15 @@ void ManagerTaskLoop(void)
   // 统一执行所有已登记外设的超时检测、重连探测与状态机流转
   PeripheralManagerUpdateAll(now_tick);
 
-  // 关键外设安全联锁保护：若关键外设发生严重故障或离线超时，执行全局紧急停机归零
+  // 关键外设安全联锁保护：若关键外设发生严重故障或离线超时，执行全局紧急停机并锁存
   if (PeripheralManagerHasCriticalFault() ||
       !PeripheralManagerIsAllCriticalOnline())
   {
     PeripheralManagerEmergencyStopAll();
+  }
+  else
+  {
+    PeripheralManagerClearEmergencyStop();
   }
 
   AppTuneLogFlushIdle();
