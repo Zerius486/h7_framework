@@ -10,6 +10,7 @@
 #include <stddef.h>
 
 #include "app_protocol.h"
+#include "app_referee.h"
 #include "app_tune_log.h"
 #include "usart.h"
 
@@ -73,4 +74,10 @@ void AppConfigInit(void)
 {
   AppTuneLogInit(&g_app_debug_log_config);
   VisionProtocolInit();
+  if (g_app_communication_config.referee_rx_huart != NULL ||
+      g_app_communication_config.referee_tx_huart != NULL)
+  {
+    RefereeInit(&g_referee, g_app_communication_config.referee_rx_huart,
+                g_app_communication_config.referee_tx_huart);
+  }
 }

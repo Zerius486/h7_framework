@@ -146,12 +146,28 @@ void RefereeInit(RefereeObject *referee, UART_HandleTypeDef *rx_huart,
   }
 
   memset(referee, 0, sizeof(*referee));
+  // 禁止占用 RS485 电机总线串口 (USART2 / USART3)
+  if ((rx_huart != NULL && UartIsRs485(rx_huart)) ||
+      (tx_huart != NULL && UartIsRs485(tx_huart)))
+  {
+    return;
+  }
+
   referee->rx_huart = rx_huart;
   referee->tx_huart = tx_huart;
   StreamBufferInit(&referee->rx_stream_buffer, referee->rx_stream,
                    sizeof(referee->rx_stream));
   PeripheralGuardInit(&referee->guard, "referee", kPeripheralTypeReferee,
                       kPeripheralDefaultTimeoutRefereeMs, referee, NULL);
+
+  if (rx_huart != NULL)
+  {
+    (void)UartSetBaudrate(rx_huart, kRefereeBaudrate);
+  }
+  if (tx_huart != NULL && tx_huart != rx_huart)
+  {
+    (void)UartSetBaudrate(tx_huart, kRefereeBaudrate);
+  }
 
   if (referee == &g_referee && rx_huart != NULL)
   {

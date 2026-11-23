@@ -551,6 +551,11 @@ typedef struct
 
 extern RefereeObject g_referee;
 
+enum
+{
+  kRefereeBaudrate = 115200U, // 裁判系统标准串口波特率（bps）
+};
+
 // API函数声明
 void RefereeInit(RefereeObject *referee, UART_HandleTypeDef *rx_huart,
                  UART_HandleTypeDef *tx_huart);

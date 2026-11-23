@@ -276,6 +276,18 @@ arm_status arm_mat_inverse_f32(const arm_matrix_instance_f32 *pSrc,
 typedef void (*HostUartRxCallback)(uint8_t *rx_buffer, uint16_t rx_length);
 typedef void (*HostSpiRxCallback)(uint8_t *rx_buffer, uint16_t rx_length);
 
+__attribute__((weak)) bool UartIsRs485(UART_HandleTypeDef *huart)
+{
+  return huart != NULL && (huart->Instance == 2U || huart->Instance == 3U);
+}
+
+__attribute__((weak)) bool UartSetBaudrate(UART_HandleTypeDef *huart,
+                                           uint32_t baudrate)
+{
+  (void)huart;
+  return huart != NULL && baudrate > 0U;
+}
+
 __attribute__((weak)) void UartInit(UART_HandleTypeDef *huart,
                                     HostUartRxCallback callback)
 {
