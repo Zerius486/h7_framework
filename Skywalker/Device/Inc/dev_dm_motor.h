@@ -101,6 +101,7 @@ typedef struct
   DmMotorType type;      // 电机类型
   DmMotorMode mode;      // 控制模式
   DmMotorLimits limits;  // 协议量程
+  int8_t direction;      // 电机方向标志（+1 正向，-1 反向）
   PeripheralGuard guard; // 统一外设生命周期守护对象
 } DmMotor;
 
@@ -111,6 +112,7 @@ float DmMotorCurrentUnitsToTorque(float current_units);
 uint32_t DmMotorTxId(const DmMotor *motor);
 void DmMotorInit(DmMotor *motor, DmMotorType type, DmMotorMode mode,
                  uint32_t id, uint32_t master_id);
+void DmMotorSetDirection(DmMotor *motor, int8_t direction);
 void DmMotorResetUnwrap(DmMotor *motor);
 void DmMotorUpdate(DmMotor *motor, const uint8_t rx_data[8]);
 void DmMotorPackCommand(DmMotor *motor, DmMotorCommand command,
@@ -119,6 +121,8 @@ void DmMotorPackEnable(DmMotor *motor, uint8_t tx_data[8]);
 void DmMotorPackDisable(DmMotor *motor, uint8_t tx_data[8]);
 void DmMotorPackZeroOffset(DmMotor *motor, uint8_t tx_data[8]);
 void DmMotorPackClearError(DmMotor *motor, uint8_t tx_data[8]);
+void DmMotorSetMitTarget(DmMotor *motor, float angle, float omega_ff,
+                         float torque_ff);
 void DmMotorPackMit(const DmMotor *motor, uint8_t tx_data[8]);
 void DmMotorPackPositionVelocity(const DmMotor *motor, uint8_t tx_data[8]);
 void DmMotorPackVelocity(const DmMotor *motor, uint8_t tx_data[8]);

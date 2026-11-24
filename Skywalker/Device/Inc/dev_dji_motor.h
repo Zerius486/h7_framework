@@ -32,6 +32,8 @@ typedef struct
   float last_angle;          // GM6020上一次单圈角度（rad）
   bool is_angle_initialized; // GM6020连续角度初始化标志
   float given_angle;         // GM6020目标角度（rad）
+  float ff_omega;            // GM6020速度前馈（rad/s，可选，默认0）
+  float ff_current;          // GM6020电流/动力学前馈（A，可选，默认0）
   float omega;               // 当前角速度（rad/s）
   float given_omega;         // 目标角速度（rad/s）
   float current;             // 当前电流（A）
@@ -60,10 +62,11 @@ typedef enum
 // DJI电机对象结构体
 typedef struct
 {
-  DjiMotorState state;    // 电机状态
-  DjiMotorType type;      // 电机类型
-  DjiMotorMode mode;      // 控制模式
-  PeripheralGuard guard;  // 统一外设生命周期守护对象
+  DjiMotorState state;   // 电机状态
+  DjiMotorType type;     // 电机类型
+  DjiMotorMode mode;     // 控制模式
+  int8_t direction;      // 电机方向标志（+1 正向，-1 反向）
+  PeripheralGuard guard; // 统一外设生命周期守护对象
 } DjiMotor;
 
 // API函数声明
@@ -73,6 +76,8 @@ void DjiMotorInit(DjiMotor *motor, DjiMotorType type, DjiMotorMode mode,
                   PidConfig *speed_pid_config, PidConfig *position_pid_config);
 bool DjiMotorEnable(DjiMotor *motor);
 void DjiMotorDisable(DjiMotor *motor);
+void DjiMotorSetDirection(DjiMotor *motor, int8_t direction);
+void DjiMotorSetFeedforward(DjiMotor *motor, float ff_omega, float ff_current);
 void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data);
 void DjiMotorCurrentCalculate(DjiMotor *motor);
 void DjiMotorCurrentCalculateWithFeedback(DjiMotor *motor,

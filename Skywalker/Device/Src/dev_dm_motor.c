@@ -25,6 +25,7 @@ static void DmMotorGuardDisableHook(void *device_ptr)
     return;
   }
   motor->state.is_enabled = false;
+  motor->state.given_omega = 0.0f;
   motor->state.given_torque = 0.0f;
   motor->state.kp = 0.0f;
   motor->state.kd = 0.0f;
@@ -38,6 +39,7 @@ static void DmMotorGuardResyncHook(void *device_ptr)
     return;
   }
   motor->state.is_enabled = false;
+  motor->state.given_omega = 0.0f;
   motor->state.given_torque = 0.0f;
   motor->state.kp = 0.0f;
   motor->state.kd = 0.0f;
@@ -165,6 +167,7 @@ void DmMotorInit(DmMotor *motor, DmMotorType type, DmMotorMode mode,
   memset(motor, 0, sizeof(*motor));
   motor->type = type;
   motor->mode = mode;
+  motor->direction = 1;
   motor->state.id = id;
   motor->state.master_id = master_id;
   motor->state.velocity_limit = kDmForcePositionDefaultVelocityLimit;
@@ -190,6 +193,25 @@ void DmMotorInit(DmMotor *motor, DmMotorType type, DmMotorMode mode,
   };
   PeripheralGuardInit(&motor->guard, "dm_motor", kPeripheralTypeMotorDm,
                       kPeripheralDefaultTimeoutMotorMs, motor, &ops);
+}
+
+/**
+ * @brief 设置达妙电机方向标志（+1 正向，-1 反向）
+ * @param motor 达妙电机对象指针
+ * @param direction 方向标志（>=0 视为 +1，<0 视为 -1）
+ */
+void DmMotorSetDirection(DmMotor *motor, int8_t direction)
+{
+  if (motor == NULL)
+  {
+    return;
+  }
+  int8_t normalized = (direction < 0) ? -1 : 1;
+  if (motor->direction != normalized)
+  {
+    motor->direction = normalized;
+    DmMotorResetUnwrap(motor);
+  }
 }
 
 /**
@@ -235,13 +257,17 @@ void DmMotorUpdate(DmMotor *motor, const uint8_t rx_data[8])
   uint16_t torque =
       (uint16_t)((((uint16_t)rx_data[4] & 0x0FU) << 8) | (uint16_t)rx_data[5]);
 
+  float dir = (motor->direction < 0) ? -1.0f : 1.0f;
   motor->state.error_code = (uint8_t)(rx_data[0] >> 4);
-  float raw_angle = DmMotorUintToFloat(position, -motor->limits.position_max,
-                                       motor->limits.position_max, 16);
-  motor->state.omega = DmMotorUintToFloat(velocity, -motor->limits.velocity_max,
-                                          motor->limits.velocity_max, 12);
-  motor->state.torque = DmMotorUintToFloat(torque, -motor->limits.torque_max,
-                                           motor->limits.torque_max, 12);
+  float raw_angle =
+      dir * DmMotorUintToFloat(position, -motor->limits.position_max,
+                               motor->limits.position_max, 16);
+  motor->state.omega =
+      dir * DmMotorUintToFloat(velocity, -motor->limits.velocity_max,
+                               motor->limits.velocity_max, 12);
+  motor->state.torque =
+      dir * DmMotorUintToFloat(torque, -motor->limits.torque_max,
+                               motor->limits.torque_max, 12);
   motor->state.temperature_mos = (float)rx_data[6];
   motor->state.temperature_rotor = (float)rx_data[7];
 
@@ -372,6 +398,34 @@ void DmMotorPackClearError(DmMotor *motor, uint8_t tx_data[8])
 }
 
 /**
+ * @brief 设置达妙MIT模式目标角度与可选双级前馈（速度前馈 + 力矩/加速度前馈）
+ * @param motor 达妙电机对象指针
+ * @param angle 目标角度（rad）
+ * @param omega_ff 速度前馈（rad/s），不启用传 0.0f
+ * @param torque_ff 力矩前馈（Nm），不启用传 0.0f
+ */
+void DmMotorSetMitTarget(DmMotor *motor, float angle, float omega_ff,
+                         float torque_ff)
+{
+  if (motor == NULL)
+  {
+    return;
+  }
+  if (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard))
+  {
+    motor->state.given_omega = 0.0f;
+    motor->state.given_torque = 0.0f;
+    return;
+  }
+  if (isfinite(angle))
+  {
+    motor->state.given_angle = angle;
+  }
+  motor->state.given_omega = isfinite(omega_ff) ? omega_ff : 0.0f;
+  motor->state.given_torque = isfinite(torque_ff) ? torque_ff : 0.0f;
+}
+
+/**
  * @brief 打包MIT模式控制帧
  * @param motor 达妙电机对象指针
  * @param tx_data 输出数据缓冲区，长度8字节
@@ -383,11 +437,13 @@ void DmMotorPackMit(const DmMotor *motor, uint8_t tx_data[8])
     return;
   }
 
+  float given_omega = motor->state.given_omega;
   float given_torque = motor->state.given_torque;
   float kp = motor->state.kp;
   float kd = motor->state.kd;
   if (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard))
   {
+    given_omega = 0.0f;
     given_torque = 0.0f;
     kp = 0.0f;
     kd = 0.0f;
@@ -407,18 +463,19 @@ void DmMotorPackMit(const DmMotor *motor, uint8_t tx_data[8])
         (float)((double)target_angle - (double)motor->state.wraps * span);
   }
 
-  uint16_t position = DmMotorFloatToUint(target_angle,
+  float dir = (motor->direction < 0) ? -1.0f : 1.0f;
+  uint16_t position = DmMotorFloatToUint(dir * target_angle,
                                          -motor->limits.position_max,
                                          motor->limits.position_max, 16);
   uint16_t velocity =
-      DmMotorFloatToUint(motor->state.given_omega, -motor->limits.velocity_max,
+      DmMotorFloatToUint(dir * given_omega, -motor->limits.velocity_max,
                          motor->limits.velocity_max, 12);
   uint16_t kp_uint =
       DmMotorFloatToUint(kp, kDmMotorKpMin, kDmMotorKpMax, 12);
   uint16_t kd_uint =
       DmMotorFloatToUint(kd, kDmMotorKdMin, kDmMotorKdMax, 12);
   uint16_t torque =
-      DmMotorFloatToUint(given_torque, -motor->limits.torque_max,
+      DmMotorFloatToUint(dir * given_torque, -motor->limits.torque_max,
                          motor->limits.torque_max, 12);
 
   tx_data[0] = (uint8_t)(position >> 8);
@@ -455,7 +512,8 @@ void DmMotorPackPositionVelocity(const DmMotor *motor, uint8_t tx_data[8])
     omega = 0.0f;
   }
 
-  DmMotorPackFloat(angle, &tx_data[0]);
+  float dir = (motor->direction < 0) ? -1.0f : 1.0f;
+  DmMotorPackFloat(dir * angle, &tx_data[0]);
   DmMotorPackFloat(omega, &tx_data[4]);
 }
 
@@ -471,11 +529,12 @@ void DmMotorPackVelocity(const DmMotor *motor, uint8_t tx_data[8])
     return;
   }
 
+  float dir = (motor->direction < 0) ? -1.0f : 1.0f;
   float omega = (!motor->state.is_enabled || !PeripheralIsEnabled(&motor->guard) ||
                  !isfinite(motor->state.given_omega))
                     ? 0.0f
                     : motor->state.given_omega;
-  DmMotorPackFloat(omega, &tx_data[0]);
+  DmMotorPackFloat(dir * omega, &tx_data[0]);
   memset(&tx_data[4], 0, 4);
 }
 
@@ -504,7 +563,8 @@ void DmMotorPackForcePosition(const DmMotor *motor, uint8_t tx_data[8])
     current_limit = 0U;
   }
 
-  DmMotorPackFloat(angle, &tx_data[0]);
+  float dir = (motor->direction < 0) ? -1.0f : 1.0f;
+  DmMotorPackFloat(dir * angle, &tx_data[0]);
   tx_data[4] = (uint8_t)(velocity_limit & 0xFFU);
   tx_data[5] = (uint8_t)(velocity_limit >> 8);
   tx_data[6] = (uint8_t)(current_limit & 0xFFU);

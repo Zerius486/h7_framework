@@ -40,12 +40,14 @@ typedef struct
 typedef struct
 {
   LkMotorState state;    // 电机状态
+  int8_t direction;      // 电机方向标志（+1 正向，-1 反向）
   PeripheralGuard guard; // 统一外设生命周期守护对象
 } LkMotor;
 
 // API函数声明
 uint32_t LkMotorFeedbackId(const LkMotor *motor);
 void LkMotorInit(LkMotor *motor, uint8_t id);
+void LkMotorSetDirection(LkMotor *motor, int8_t direction);
 void LkMotorUpdate(LkMotor *motor, const uint8_t rx_data[8]);
 void LkMotorSetCurrentUnits(LkMotor *motor, int16_t current_units);
 void LkMotorEnable(LkMotor *motor);

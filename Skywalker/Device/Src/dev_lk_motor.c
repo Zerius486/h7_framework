@@ -89,6 +89,7 @@ void LkMotorInit(LkMotor *motor, uint8_t id)
   memset(motor, 0, sizeof(*motor));
   motor->state.id = id;
   motor->state.is_enabled = false;
+  motor->direction = 1;
 
   PeripheralOps ops = {
       .on_enable = LkMotorGuardEnableHook,
@@ -100,6 +101,26 @@ void LkMotorInit(LkMotor *motor, uint8_t id)
   };
   PeripheralGuardInit(&motor->guard, "lk_motor", kPeripheralTypeMotorLk,
                       kPeripheralDefaultTimeoutMotorMs, motor, &ops);
+}
+
+/**
+ * @brief 设置LK电机方向标志（+1 正向，-1 反向）
+ * @param motor LK电机对象指针
+ * @param direction 方向标志（>=0 视为 +1，<0 视为 -1）
+ */
+void LkMotorSetDirection(LkMotor *motor, int8_t direction)
+{
+  if (motor == NULL)
+  {
+    return;
+  }
+  int8_t normalized = (direction < 0) ? -1 : 1;
+  if (motor->direction != normalized)
+  {
+    motor->direction = normalized;
+    motor->state.is_encoder_initialized = false;
+    motor->state.total_round = 0;
+  }
 }
 
 /**
@@ -123,9 +144,14 @@ void LkMotorUpdate(LkMotor *motor, const uint8_t rx_data[8])
     return;
   }
 
+  int8_t dir = (motor->direction < 0) ? -1 : 1;
+  float dir_f = (float)dir;
+  uint16_t raw_encoder =
+      (uint16_t)(((uint16_t)rx_data[7] << 8) | (uint16_t)rx_data[6]);
+
   motor->state.last_encoder = motor->state.encoder;
   motor->state.encoder =
-      (uint16_t)(((uint16_t)rx_data[7] << 8) | (uint16_t)rx_data[6]);
+      (dir < 0) ? (uint16_t)(65536U - (uint32_t)raw_encoder) : raw_encoder;
 
   // 通过编码器跨半圈阈值判断溢出方向，得到连续累计角度。
   if (!motor->state.is_encoder_initialized)
@@ -150,8 +176,10 @@ void LkMotorUpdate(LkMotor *motor, const uint8_t rx_data[8])
 
   int16_t speed_dps =
       (int16_t)(((uint16_t)rx_data[5] << 8) | (uint16_t)rx_data[4]);
-  motor->state.current_units =
+  int16_t raw_current_units =
       (int16_t)(((uint16_t)rx_data[3] << 8) | (uint16_t)rx_data[2]);
+  motor->state.current_units =
+      (int16_t)((int32_t)dir * (int32_t)LkMotorClampCurrent(raw_current_units));
   motor->state.temperature = rx_data[1];
   motor->state.angle = (float)motor->state.encoder * kLkMotorEncoderToDegree *
                        kLkMotorDegreeToRadian;
@@ -159,7 +187,7 @@ void LkMotorUpdate(LkMotor *motor, const uint8_t rx_data[8])
       ((float)motor->state.total_round * 360.0f +
        (float)motor->state.encoder * kLkMotorEncoderToDegree) *
       kLkMotorDegreeToRadian;
-  motor->state.omega = (float)speed_dps * kLkMotorDegreeToRadian;
+  motor->state.omega = dir_f * (float)speed_dps * kLkMotorDegreeToRadian;
   motor->state.torque =
       (float)motor->state.current_units * kLkMotorCurrentToTorque;
 }
@@ -231,9 +259,10 @@ void LkMotorPackCurrentGroup(LkMotor *const motors[], uint8_t motor_count,
       continue;
     }
 
+    int8_t dir = (motor->direction < 0) ? -1 : 1;
     int16_t current =
         (motor->state.is_enabled && PeripheralIsEnabled(&motor->guard))
-            ? LkMotorClampCurrent(motor->state.given_current_units)
+            ? (int16_t)(dir * LkMotorClampCurrent(motor->state.given_current_units))
             : 0;
     uint8_t offset = (uint8_t)((motor->state.id - 1U) * 2U);
     tx_data[offset] = (uint8_t)(current & 0xFF);

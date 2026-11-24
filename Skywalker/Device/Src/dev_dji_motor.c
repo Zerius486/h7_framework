@@ -26,6 +26,8 @@ static void DjiMotorGuardDisableHook(void *device_ptr)
   }
   motor->state.is_enabled = false;
   motor->state.given_current = 0.0f;
+  motor->state.ff_omega = 0.0f;
+  motor->state.ff_current = 0.0f;
   PidReset(&motor->state.speed_loop);
   if (motor->type == kDjiMotorGm6020)
   {
@@ -43,6 +45,8 @@ static void DjiMotorGuardResyncHook(void *device_ptr)
   // 离线恢复后防暴冲重同步：复位积分器并保持失能待命，GM6020重置连续角度基准
   motor->state.is_enabled = false;
   motor->state.given_current = 0.0f;
+  motor->state.ff_omega = 0.0f;
+  motor->state.ff_current = 0.0f;
   PidReset(&motor->state.speed_loop);
   if (motor->type == kDjiMotorGm6020)
   {
@@ -165,6 +169,7 @@ void DjiMotorInit(DjiMotor *motor, DjiMotorType type, DjiMotorMode mode,
 
   motor->state.is_enabled = false;
   motor->type = type;
+  motor->direction = 1;
   if (type == kDjiMotorGm6020 && mode == kDjiMotorModePosition &&
       position_pid_config != NULL)
   {
@@ -216,6 +221,48 @@ void DjiMotorDisable(DjiMotor *motor)
 }
 
 /**
+ * @brief 设置DJI电机方向标志（+1 正向，-1 反向）
+ * @param motor DJI电机结构体指针
+ * @param direction 方向标志（>=0 视为 +1，<0 视为 -1）
+ */
+void DjiMotorSetDirection(DjiMotor *motor, int8_t direction)
+{
+  if (motor == NULL)
+  {
+    return;
+  }
+  int8_t normalized = (direction < 0) ? -1 : 1;
+  if (motor->direction != normalized)
+  {
+    motor->direction = normalized;
+    motor->state.is_angle_initialized = false;
+    motor->state.total_round = 0;
+  }
+}
+
+/**
+ * @brief 设置GM6020可选双级前馈（速度前馈 + 电流/加速度前馈）
+ * @param motor DJI电机结构体指针
+ * @param ff_omega 速度前馈（rad/s），不启用传 0.0f
+ * @param ff_current 电流前馈（A），不启用传 0.0f
+ */
+void DjiMotorSetFeedforward(DjiMotor *motor, float ff_omega, float ff_current)
+{
+  if (motor == NULL)
+  {
+    return;
+  }
+  if (motor->type != kDjiMotorGm6020)
+  {
+    motor->state.ff_omega = 0.0f;
+    motor->state.ff_current = 0.0f;
+    return;
+  }
+  motor->state.ff_omega = isfinite(ff_omega) ? ff_omega : 0.0f;
+  motor->state.ff_current = isfinite(ff_current) ? ff_current : 0.0f;
+}
+
+/**
  * @brief 更新DJI电机状态，从CAN接收数据解析角度、角速度、电流和温度
  * @param motor DJI电机结构体指针
  * @param rx_data 接收数据缓冲区指针
@@ -231,8 +278,11 @@ void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data)
   int16_t rpm = (int16_t)(((uint16_t)rx_data[2] << 8) | rx_data[3]);
   int16_t current_units = (int16_t)(((uint16_t)rx_data[4] << 8) | rx_data[5]);
 
-  motor->state.angle = EncoderToRadian(encoder);
-  motor->state.omega = RpmToRadS((float)rpm);
+  float dir = (motor->direction < 0) ? -1.0f : 1.0f;
+  float raw_angle = EncoderToRadian(encoder);
+  motor->state.angle =
+      (dir < 0.0f && raw_angle > 0.0f) ? (2.0f * (float)M_PI - raw_angle) : raw_angle;
+  motor->state.omega = dir * RpmToRadS((float)rpm);
 
   // 先刷新外设心跳喂狗，若刚从离线态恢复则先触发 on_resync 重置连续角展开基准
   PeripheralGuardFeed(&motor->guard, HAL_GetTick());
@@ -264,7 +314,7 @@ void DjiMotorUpdate(DjiMotor *motor, uint8_t *rx_data)
     }
   }
   motor->state.current =
-      DjiMotorCurrentUnitsToAmperes(motor->type, current_units);
+      dir * DjiMotorCurrentUnitsToAmperes(motor->type, current_units);
 
   if (motor->type == kDjiMotorM3508 || motor->type == kDjiMotorGm6020)
   {
@@ -325,12 +375,20 @@ void DjiMotorCurrentCalculateWithFeedback(DjiMotor *motor,
     }
     float position_reference = DjiMotorPositionReference(
         motor, position_feedback, omega_feedback);
+    float ff_omega =
+        isfinite(motor->state.ff_omega) ? motor->state.ff_omega : 0.0f;
+    float ff_current =
+        isfinite(motor->state.ff_current) ? motor->state.ff_current : 0.0f;
 
-    motor->state.given_omega = PidCalculate(
-        &motor->state.position_loop, position_reference,
-        position_feedback);
-    motor->state.given_current = PidCalculate(
-        &motor->state.speed_loop, motor->state.given_omega, omega_feedback);
+    motor->state.given_omega =
+        PidCalculate(&motor->state.position_loop, position_reference,
+                     position_feedback) +
+        ff_omega;
+    float raw_current =
+        PidCalculate(&motor->state.speed_loop, motor->state.given_omega,
+                     omega_feedback) +
+        ff_current;
+    motor->state.given_current = raw_current;
     break;
   }
   default:
@@ -343,8 +401,16 @@ void DjiMotorCurrentCalculateWithFeedback(DjiMotor *motor,
   float current_limit = DjiMotorCurrentLimitA(motor->type);
   if (current_limit > 0.0f)
   {
+    float unclamped = motor->state.given_current;
     motor->state.given_current = MathClamp(motor->state.given_current,
                                            -current_limit, current_limit);
+    if (motor->state.speed_loop.is_antiwindup_enabled &&
+        motor->state.given_current != unclamped)
+    {
+      PidTrackOutput(&motor->state.speed_loop,
+                     motor->state.given_current - unclamped,
+                     motor->state.speed_loop.inv_dt);
+    }
   }
 }
 
@@ -399,8 +465,9 @@ void DjiMotorPackCurrentGroup(DjiMotor *const motors[], uint8_t motor_count,
       continue;
     }
     uint32_t slot = motor->state.id - first_id;
+    float dir = (motor->direction < 0) ? -1.0f : 1.0f;
     uint16_t current = (uint16_t)DjiMotorCurrentAmperesToUnits(
-        motor->type, motor->state.given_current);
+        motor->type, dir * motor->state.given_current);
     tx_data[2U * slot] = (uint8_t)(current >> 8);
     tx_data[2U * slot + 1U] = (uint8_t)current;
   }
