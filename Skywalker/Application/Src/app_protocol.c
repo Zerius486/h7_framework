@@ -41,6 +41,7 @@ static void VisionGuardOfflineHook(void *device_ptr)
   g_vision_to_gimbal.yaw_acceleration = 0.0f;
   g_vision_to_gimbal.pitch_velocity = 0.0f;
   g_vision_to_gimbal.pitch_acceleration = 0.0f;
+  g_vision_to_gimbal.fire_rate_hz = 0U;
   if (primask == 0U)
   {
     __enable_irq();
@@ -70,7 +71,7 @@ static bool VisionProtocolHeaderIsValid(const uint8_t *data)
 
 static bool VisionProtocolFrameIsValid(const VisionToGimbal *frame)
 {
-  if (frame == NULL || frame->mode > 2U)
+  if (frame == NULL || frame->mode > 2U || frame->fire_rate_hz > 40U)
   {
     return false;
   }
@@ -169,6 +170,27 @@ bool VisionProtocolGetCommand(VisionToGimbal *out)
     __enable_irq();
   }
   return VisionProtocolFrameIsValid(out);
+}
+
+/**
+ * @brief 根据视觉指令与下位机最大允许射频计算最终拨弹频率（Hz）
+ * @param cmd 视觉控制指令指针
+ * @param max_frequency_hz 下位机当前热量/机构允许的最大射频（Hz）
+ * @return 期望拨弹频率（Hz）；非开火模式或无效指令返回 0.0f
+ */
+float VisionProtocolGetFireFrequency(const VisionToGimbal *cmd, float max_frequency_hz)
+{
+  if (cmd == NULL || cmd->mode != 2U || !isfinite(max_frequency_hz) || max_frequency_hz <= 0.0f)
+  {
+    return 0.0f;
+  }
+  if (cmd->fire_rate_hz == 0U)
+  {
+    // 上位机未指定射频时，按电控默认最大允许射频执行
+    return max_frequency_hz;
+  }
+  float req = (float)cmd->fire_rate_hz;
+  return (req < max_frequency_hz) ? req : max_frequency_hz;
 }
 
 /**

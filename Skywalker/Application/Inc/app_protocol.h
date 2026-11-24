@@ -39,6 +39,7 @@ typedef struct
   float pitch;              // 视觉期望pitch角度（rad）
   float pitch_velocity;     // 视觉期望pitch速度（rad/s）
   float pitch_acceleration; // 视觉期望pitch加速度（rad/s^2）
+  uint8_t fire_rate_hz;     // 视觉建议射频（Hz，0表示停火/默认；下位机保留热量上限裁决权）
   uint16_t crc16;           // CRC16，低字节在前
 } VisionToGimbal;
 
@@ -51,6 +52,7 @@ extern PeripheralGuard g_vision_guard;
 void VisionProtocolInit(void);
 void VisionProtocolRxCallback(uint8_t *rx_buffer, uint16_t rx_length);
 bool VisionProtocolGetCommand(VisionToGimbal *out);
+float VisionProtocolGetFireFrequency(const VisionToGimbal *cmd, float max_frequency_hz);
 void VisionProtocolTransmitGimbalState(void);
 
 #endif // APP_PROTOCOL_H

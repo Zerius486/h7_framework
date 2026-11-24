@@ -85,75 +85,43 @@
         <mxCell id="e_e_d" value="失能指令 0xFD / 遥控器急停" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.7;exitY=0.0;exitDx=0;exitDy=0;entryX=0.7;entryY=1.0;entryDx=0;entryDy=0;strokeColor=#CA8A04;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_enabled" target="s_disabled">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_p_off" value="首帧握手&lt;br&gt;响应超时" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.5;exitDx=0;exitDy=0;entryX=1.0;entryY=0.22;entryDx=0;entryDy=0;strokeColor=#EA580C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_probe" target="s_offline">
+        <mxCell id="e_p_off" value="首帧握手&lt;br&gt;响应超时" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.5;exitDx=0;exitDy=0;entryX=1.0;entryY=0.194444;entryDx=0;entryDy=0;strokeColor=#EA580C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_probe" target="s_offline">
           <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="602" y="580" />
-              <mxPoint x="602" y="585" />
-            </Array>
-          </mxGeometry>
+            </mxGeometry>
         </mxCell>
-        <mxCell id="e_d_off" value="待命期&lt;br&gt;反馈中断" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.25;exitDx=0;exitDy=0;entryX=1.0;entryY=0.78;entryDx=0;entryDy=0;strokeColor=#EA580C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_disabled" target="s_offline">
+        <mxCell id="e_d_off" value="待命期&lt;br&gt;反馈中断" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.247619;exitDx=0;exitDy=0;entryX=1.0;entryY=0.777778;entryDx=0;entryDy=0;strokeColor=#EA580C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_disabled" target="s_offline">
           <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="602" y="876" />
-              <mxPoint x="602" y="685" />
-            </Array>
-          </mxGeometry>
+            <Array as="points"><mxPoint x="602" y="876" /><mxPoint x="602" y="685" /></Array></mxGeometry>
         </mxCell>
         <mxCell id="e_e_off" value="运行期通信超时 \(\Delta t_{\text{rx}} &gt; T_{\text{timeout}}\) (强制急停)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#EA580C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_enabled" target="s_offline">
           <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="58" y="1058" />
-              <mxPoint x="58" y="635" />
-            </Array>
-          </mxGeometry>
+            <Array as="points"><mxPoint x="700" y="1057.5" /><mxPoint x="58" y="1057.5" /><mxPoint x="58" y="635" /></Array></mxGeometry>
         </mxCell>
         <mxCell id="e_off_rec" value="切入低频重连探测" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#C2410C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_offline" target="s_reconnect">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_rec_d" value="报文恢复 &amp;&lt;br&gt;多圈角重同步" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.72;entryDx=0;entryDy=0;strokeColor=#15803D;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_reconnect" target="s_disabled">
+        <mxCell id="e_rec_d" value="报文恢复 &amp;&lt;br&gt;多圈角重同步" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.690476;entryDx=0;entryDy=0;strokeColor=#15803D;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_reconnect" target="s_disabled">
           <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="602" y="922" />
-              <mxPoint x="602" y="925" />
-            </Array>
-          </mxGeometry>
+            </mxGeometry>
         </mxCell>
-        <mxCell id="e_p_flt" value="传感器自检异常&lt;br&gt;Bmi088Error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.22;entryDx=0;entryDy=0;strokeColor=#DC2626;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_probe" target="s_fault">
+        <mxCell id="e_p_flt" value="传感器自检异常&lt;br&gt;Bmi088Error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.189189;entryDx=0;entryDy=0;strokeColor=#DC2626;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_probe" target="s_fault">
           <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="1438" y="580" />
-              <mxPoint x="1438" y="586" />
-            </Array>
-          </mxGeometry>
+            </mxGeometry>
         </mxCell>
-        <mxCell id="e_c_flt" value="标定晃动超限&lt;br&gt;或 EKF 异常" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.0;entryY=0.78;entryDx=0;entryDy=0;strokeColor=#DC2626;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_calib" target="s_fault">
+        <mxCell id="e_c_flt" value="标定晃动超限&lt;br&gt;或 EKF 异常" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.2;exitDx=0;exitDy=0;entryX=0.0;entryY=0.881081;entryDx=0;entryDy=0;strokeColor=#DC2626;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_calib" target="s_fault">
           <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="1438" y="742" />
-              <mxPoint x="1438" y="689" />
-            </Array>
-          </mxGeometry>
+            </mxGeometry>
         </mxCell>
         <mxCell id="e_e_flt" value="故障码非零或 Bus-Off 硬件保护" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1.0;exitY=0.5;exitDx=0;exitDy=0;entryX=1.0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#DC2626;strokeWidth=2.0;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_enabled" target="s_fault">
           <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="1980" y="1058" />
-              <mxPoint x="1980" y="638" />
-            </Array>
-          </mxGeometry>
+            <Array as="points"><mxPoint x="1340" y="1057.5" /><mxPoint x="1980" y="1057.5" /><mxPoint x="1980" y="637.5" /></Array></mxGeometry>
         </mxCell>
         <mxCell id="e_flt_clr" value="执行 0xFB 清错 / 总线软复位" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;strokeColor=#B91C1C;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_fault" target="s_clear">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_clr_d" value="故障码清零 &amp;&lt;br&gt;退回安全待命" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.5;exitDx=0;exitDy=0;entryX=1.0;entryY=0.72;entryDx=0;entryDy=0;strokeColor=#15803D;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_clear" target="s_disabled">
+        <mxCell id="e_clr_d" value="故障码清零 &amp;&lt;br&gt;退回安全待命" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.0;exitY=0.5;exitDx=0;exitDy=0;entryX=1.0;entryY=0.690476;entryDx=0;entryDy=0;strokeColor=#15803D;strokeWidth=2.0;dashed=1;startArrow=none;endArrow=classic;" edge="1" parent="1" source="s_clear" target="s_disabled">
           <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="1438" y="922" />
-              <mxPoint x="1438" y="925" />
-            </Array>
-          </mxGeometry>
+            </mxGeometry>
         </mxCell>
       </root>
     </mxGraphModel>
