@@ -11,7 +11,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "alg_quaternion.h"
 #include "dev_peripheral.h"
+#include "stm32h7xx_hal.h"
+
+enum
+{
+  kVisionProtocolBaudrate = 921600U, // 与 rm_auto_aim 默认串口波特率对齐（bps）
+};
 
 #pragma pack(push, 1)
 
@@ -45,14 +52,34 @@ typedef struct
 
 #pragma pack(pop)
 
+// 视觉通信链路诊断统计结构体
+typedef struct
+{
+  uint32_t rx_frame_count;      // 校验通过的接收帧数
+  uint32_t crc_error_count;     // CRC16 校验失败次数
+  uint32_t invalid_frame_count; // 字段范围/有限值非法次数
+  uint32_t tx_frame_count;      // 成功提交发送的帧数
+  uint32_t tx_drop_count;       // 串口忙或未就绪导致的发送丢包数
+} VisionProtocolStats;
+
 extern GimbalToVision g_gimbal_to_vision;
 extern VisionToGimbal g_vision_to_gimbal;
 extern PeripheralGuard g_vision_guard;
 
 void VisionProtocolInit(void);
+bool VisionProtocolInitWithUart(UART_HandleTypeDef *huart);
 void VisionProtocolRxCallback(uint8_t *rx_buffer, uint16_t rx_length);
 bool VisionProtocolGetCommand(VisionToGimbal *out);
+bool VisionProtocolSampleCommand(VisionToGimbal *out, float max_extrapolate_s);
 float VisionProtocolGetFireFrequency(const VisionToGimbal *cmd, float max_frequency_hz);
+void VisionProtocolUpdateGimbalState(uint8_t mode, const float q[4], float yaw,
+                                     float yaw_velocity, float pitch,
+                                     float pitch_velocity, float bullet_speed,
+                                     uint16_t bullet_count);
+void VisionProtocolUpdateFromFluImu(uint8_t mode, Quaternion q_i2w,
+                                    float gyro_y_rad_s, float gyro_z_rad_s,
+                                    float bullet_speed, uint16_t bullet_count);
 void VisionProtocolTransmitGimbalState(void);
+void VisionProtocolGetStats(VisionProtocolStats *out);
 
 #endif // APP_PROTOCOL_H
